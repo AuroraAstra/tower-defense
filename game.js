@@ -1,4 +1,4 @@
-const GAME_VERSION = "0.5.0";
+const GAME_VERSION = "0.6.0";
 const AUTO_WAVE_DELAY = 7;
 const SAVE_KEY = "homewatch_tower_defense_save_v1";
 
