@@ -1,5 +1,6 @@
 :root {
   color-scheme: dark;
+  --app-height: 100vh;
   --bg: #132019;
   --panel: #1f2a2a;
   --panel-2: #2a3936;
@@ -20,6 +21,7 @@ html,
 body {
   width: 100%;
   height: 100%;
+  overflow-x: hidden;
 }
 
 body {
@@ -52,7 +54,7 @@ button:disabled {
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: 16px;
   width: min(1480px, 100%);
-  min-height: 100vh;
+  min-height: var(--app-height);
   margin: 0 auto;
   padding: 16px;
 }
@@ -62,7 +64,7 @@ button:disabled {
   display: grid;
   align-content: start;
   gap: 18px;
-  min-height: calc(100vh - 32px);
+  min-height: calc(var(--app-height) - 32px);
   padding: 22px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
@@ -76,7 +78,8 @@ button:disabled {
 .game-surface.hide,
 .hud.hide,
 .build-menu.hide,
-.pause-menu.hide {
+.pause-menu.hide,
+.briefing.hide {
   display: none;
 }
 
@@ -148,8 +151,128 @@ button:disabled {
   opacity: 0.48;
 }
 
+.briefing {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(18, 28, 34, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(98, 202, 255, 0.1);
+}
+
+.briefing__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.briefing h2,
+.briefing h3 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+.briefing h2 {
+  font-size: 24px;
+}
+
+.briefing h3 {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.briefing__grid {
+  display: grid;
+  grid-template-columns: 0.9fr 1.1fr 1.1fr;
+  gap: 12px;
+}
+
+.briefing__section {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(34, 43, 54, 0.72);
+}
+
+.briefing ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.briefing-list,
+.tactic-list,
+.challenge-track {
+  display: grid;
+  gap: 8px;
+}
+
+.challenge-card,
+.tactic-card {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: #222b36;
+  text-align: left;
+}
+
+.challenge-card strong,
+.challenge-card span,
+.tactic-card strong,
+.tactic-card span {
+  display: block;
+  min-width: 0;
+}
+
+.challenge-card strong,
+.tactic-card strong {
+  font-size: 14px;
+}
+
+.challenge-card span,
+.tactic-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.challenge-card.complete {
+  border-color: rgba(120, 235, 167, 0.64);
+  background: #243b32;
+}
+
+.tactic-card {
+  cursor: pointer;
+}
+
+.tactic-card.active {
+  border-color: var(--amber);
+  background: #3a3423;
+  box-shadow: inset 0 0 0 1px rgba(255, 199, 90, 0.22);
+}
+
+.tactic-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
 .game-surface {
   position: relative;
+  align-self: stretch;
   min-height: 420px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.09);
@@ -162,8 +285,9 @@ canvas {
   display: block;
   width: 100%;
   height: 100%;
-  min-height: calc(100vh - 32px);
+  min-height: calc(var(--app-height) - 32px);
   image-rendering: auto;
+  touch-action: manipulation;
 }
 
 .toast {
@@ -355,6 +479,41 @@ h1 {
   gap: 8px;
 }
 
+.challenge-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.challenge-chip {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px;
+  border-radius: 8px;
+  background: #222b36;
+}
+
+.challenge-chip strong,
+.challenge-chip span {
+  display: block;
+  min-width: 0;
+}
+
+.challenge-chip strong {
+  font-size: 12px;
+}
+
+.challenge-chip span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.challenge-chip.complete {
+  background: #243b32;
+  color: var(--mint);
+}
+
 .level-map {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -481,8 +640,14 @@ h1 {
     padding: 10px;
   }
 
+  .game-surface {
+    min-height: 0;
+  }
+
   canvas {
-    min-height: 58vh;
+    height: auto;
+    min-height: 0;
+    aspect-ratio: 5 / 3;
   }
 
   .hud {
@@ -496,12 +661,139 @@ h1 {
   }
 
   .level-screen {
-    min-height: calc(100vh - 20px);
+    min-height: calc(var(--app-height) - 20px);
     padding: 16px;
   }
 
   .level-select-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .briefing__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 920px) and (orientation: portrait) {
+  html,
+  body {
+    height: auto;
+    min-height: var(--app-height);
+    overflow-y: auto;
+  }
+
+  canvas {
+    height: min(58vh, 520px);
+    min-height: 320px;
+    aspect-ratio: auto;
+  }
+}
+
+@media (max-width: 920px) and (orientation: landscape) {
+  html,
+  body {
+    height: var(--app-height);
+    overflow: hidden;
+  }
+
+  .shell {
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 8px;
+    height: var(--app-height);
+    min-height: 0;
+    padding: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right))
+      max(6px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+  }
+
+  .game-surface {
+    min-height: 0;
+  }
+
+  canvas {
+    height: 100%;
+    aspect-ratio: auto;
+  }
+
+  .hud {
+    grid-template-columns: minmax(150px, 0.8fr) minmax(220px, 1.4fr) repeat(3, minmax(86px, 0.7fr));
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  .brand,
+  .stats {
+    grid-column: auto;
+  }
+
+  .brand {
+    padding: 8px 10px;
+  }
+
+  .brand .eyebrow,
+  .level-panel,
+  .challenge-panel {
+    display: none;
+  }
+
+  h1 {
+    font-size: 18px;
+  }
+
+  .icon-button {
+    flex-basis: 34px;
+    width: 34px;
+    height: 34px;
+  }
+
+  .stats {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .stats div {
+    padding: 7px 8px;
+  }
+
+  .stats span {
+    font-size: 10px;
+  }
+
+  .stats strong {
+    font-size: 16px;
+  }
+
+  .primary,
+  .secondary {
+    min-height: 40px;
+    padding: 0 8px;
+    font-size: 13px;
+  }
+
+  .toast {
+    left: 10px;
+    top: 10px;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  .build-menu {
+    width: min(210px, calc(100% - 20px));
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .build-option {
+    grid-template-columns: 24px 1fr auto;
+    gap: 7px;
+    padding: 7px;
+  }
+
+  .build-option strong {
+    font-size: 13px;
+  }
+
+  .build-option small,
+  .build-cost {
+    font-size: 11px;
   }
 }
 
@@ -521,6 +813,10 @@ h1 {
 
   .level-select-grid {
     grid-template-columns: 1fr;
+  }
+
+  .briefing {
+    padding: 12px;
   }
 
   .start-level-card {

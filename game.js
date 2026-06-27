@@ -15,6 +15,13 @@ const ui = {
   levelScreen: document.querySelector("#levelScreen"),
   startLevelMap: document.querySelector("#startLevelMap"),
   continueBtn: document.querySelector("#continueBtn"),
+  briefing: document.querySelector("#briefing"),
+  briefingTitle: document.querySelector("#briefingTitle"),
+  briefingCloseBtn: document.querySelector("#briefingCloseBtn"),
+  rulesList: document.querySelector("#rulesList"),
+  challengeList: document.querySelector("#challengeList"),
+  tacticList: document.querySelector("#tacticList"),
+  startBriefingBtn: document.querySelector("#startBriefingBtn"),
   gameSurface: document.querySelector(".game-surface"),
   hud: document.querySelector(".hud"),
   buildMenu: document.querySelector("#buildMenu"),
@@ -27,6 +34,7 @@ const ui = {
   resumeBtn: document.querySelector("#resumeBtn"),
   pauseRestartBtn: document.querySelector("#pauseRestartBtn"),
   backToLevelsBtn: document.querySelector("#backToLevelsBtn"),
+  challengeTrack: document.querySelector("#challengeTrack"),
   toast: document.querySelector("#toast"),
 };
 
@@ -58,6 +66,7 @@ const towerTypes = {
     splash: 18,
     pierce: 1,
     slow: 0.5,
+    slowDuration: 1.9,
     shieldBonus: 1.8,
     armorPierce: 1,
     role: "减速破盾",
@@ -369,6 +378,31 @@ function createEndlessWave(waveIndex) {
 }
 
 const levels = createLevels();
+const rules = [
+  "怪物会沿道路进攻房屋，房屋耐久归零则挑战失败。",
+  "每关 5 波，倒计时结束会自动刷波，也可以手动提前开波。",
+  "清理地图道具会获得金币；防御塔可升级，战役模式最高 3 级。",
+  "特殊怪拥有高速、护盾、护甲、回血或 Boss 特性，需要搭配不同防御塔克制。",
+];
+
+const tacticCards = [
+  {
+    id: "frost",
+    name: "霜线预案",
+    text: "开局金币 +25，雪花塔费用 -10，所有减速时长再 +0.35 秒。",
+  },
+  {
+    id: "salvage",
+    name: "清障合同",
+    text: "清理道具奖励 +35%，适合先打资源再铺塔。",
+  },
+  {
+    id: "overdrive",
+    name: "抢攻节拍",
+    text: "立即开波按钮额外奖励 +18 金币，但自动倒计时缩短 2 秒。",
+  },
+];
+
 const endlessBuildSet = [
   [0.08, 0.52],
   [0.18, 0.12],
@@ -423,11 +457,26 @@ const state = {
   bullets: [],
   sparks: [],
   props: [],
+  pendingMode: "campaign",
+  pendingLevelIndex: 0,
+  selectedTactic: "frost",
+  runTactic: "frost",
+  challengeDefs: [],
+  challenges: [],
+  runStats: {
+    livesLost: 0,
+    propsCleared: 0,
+    towersBuilt: 0,
+    snowBuilt: 0,
+    slowsApplied: 0,
+    manualWaves: 0,
+  },
 };
 
 let lastLevelMapKey = "";
 let lastStartLevelMapKey = "";
 let lastBuildMenuKey = "";
+let lastChallengeTrackKey = "";
 
 function clampLevelIndex(index) {
   return Math.max(0, Math.min(levels.length - 1, Number(index) || 0));
@@ -463,6 +512,8 @@ function currentWave() {
 }
 
 function resize() {
+  const viewportHeight = window.visualViewport?.height || window.innerHeight;
+  document.documentElement.style.setProperty("--app-height", `${viewportHeight}px`);
   const rect = canvas.getBoundingClientRect();
   const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
   canvas.width = Math.floor(rect.width * dpr);
@@ -499,8 +550,10 @@ function setScreen(screen) {
   ui.levelScreen.classList.toggle("hide", inGame);
   ui.gameSurface.classList.toggle("hide", !inGame);
   ui.hud.classList.toggle("hide", !inGame);
+  if (inGame) window.scrollTo(0, 0);
   if (!inGame) {
     hideBuildMenu();
+    if (screen === "levels") closeBriefing();
     setPaused(false);
   }
   resize();
@@ -523,6 +576,136 @@ function unlockedTowerCount() {
 function isTowerUnlocked(type) {
   if (state.mode === "endless") return true;
   return towerTypes[type].unlockLevel <= state.unlockedLevel + 1;
+}
+
+function tactic() {
+  return tacticCards.find((card) => card.id === state.runTactic) || tacticCards[0];
+}
+
+function autoWaveDelay() {
+  return tactic().id === "overdrive" ? Math.max(4, AUTO_WAVE_DELAY - 2) : AUTO_WAVE_DELAY;
+}
+
+function tacticStartingCoins() {
+  return tactic().id === "frost" ? 25 : 0;
+}
+
+function tacticPropRewardMultiplier() {
+  return tactic().id === "salvage" ? 1.35 : 1;
+}
+
+function tacticManualWaveBonus() {
+  return tactic().id === "overdrive" ? 18 : 0;
+}
+
+function tacticTowerCost(type) {
+  const discount = tactic().id === "frost" && type === "snow" ? 10 : 0;
+  return Math.max(1, towerTypes[type].cost - discount);
+}
+
+function tacticSlowBonus() {
+  return tactic().id === "frost" ? 0.35 : 0;
+}
+
+function challengeSet(mode, index) {
+  if (mode === "endless") {
+    return [
+      {
+        id: "endless10",
+        name: "长线守望",
+        text: "守住 10 波",
+        reward: 120,
+        progress: () => Math.min(state.waveIndex, 10),
+        target: 10,
+      },
+      {
+        id: "snow12",
+        name: "霜冻封路",
+        text: "用雪花塔造成 12 次减速",
+        reward: 70,
+        progress: () => Math.min(state.runStats.slowsApplied, 12),
+        target: 12,
+      },
+      {
+        id: "noLoss5",
+        name: "五波无损",
+        text: "前 5 波不损失房屋耐久",
+        reward: 90,
+        progress: () => (state.waveIndex >= 5 && state.runStats.livesLost === 0 ? 1 : 0),
+        target: 1,
+      },
+    ];
+  }
+
+  const levelNumber = index + 1;
+  const challenges = [
+    {
+      id: "noLoss",
+      name: "完整守望",
+      text: "通关时不损失房屋耐久",
+      reward: 45 + levelNumber * 5,
+      progress: () => (state.levelCleared && state.runStats.livesLost === 0 ? 1 : 0),
+      target: 1,
+    },
+    {
+      id: "clearProps",
+      name: "清障专家",
+      text: "通关前清理所有地图道具",
+      reward: 35 + levelNumber * 4,
+      progress: () => Math.min(state.runStats.propsCleared, level().props.length),
+      target: () => level().props.length,
+    },
+  ];
+
+  if (levelNumber >= 2) {
+    challenges.push({
+      id: "snowSlow",
+      name: "冰线控制",
+      text: "用雪花塔造成 6 次减速",
+      reward: 55 + levelNumber * 4,
+      progress: () => Math.min(state.runStats.slowsApplied, 6),
+      target: 6,
+    });
+  } else {
+    challenges.push({
+      id: "fewTowers",
+      name: "精打细算",
+      text: "最多建造 4 座塔通关",
+      reward: 45,
+      progress: () => (state.levelCleared && state.runStats.towersBuilt <= 4 ? 1 : 0),
+      target: 1,
+    });
+  }
+
+  return challenges;
+}
+
+function challengeTarget(challenge) {
+  return typeof challenge.target === "function" ? challenge.target() : challenge.target;
+}
+
+function challengeProgress(challenge) {
+  return Math.max(0, Math.min(challengeTarget(challenge), challenge.progress()));
+}
+
+function resetRunStats() {
+  state.runStats = {
+    livesLost: 0,
+    propsCleared: 0,
+    towersBuilt: 0,
+    snowBuilt: 0,
+    slowsApplied: 0,
+    manualWaves: 0,
+  };
+}
+
+function createRunChallenges() {
+  state.challengeDefs = challengeSet(state.mode, state.levelIndex);
+  state.challenges = state.challengeDefs.map((challenge) => ({
+    id: challenge.id,
+    complete: false,
+    paid: false,
+  }));
 }
 
 function firstUnlockedTower() {
@@ -549,9 +732,9 @@ function makeProps() {
 
 function resetSharedRun() {
   state.waveIndex = 0;
-  state.countdown = AUTO_WAVE_DELAY;
+  state.countdown = autoWaveDelay();
   state.lives = level().lives;
-  state.coins = level().coins;
+  state.coins = level().coins + tacticStartingCoins();
   state.selectedBuild = null;
   state.selectedTower = null;
   state.buildMenuSite = null;
@@ -566,36 +749,61 @@ function resetSharedRun() {
   state.bullets = [];
   state.sparks = [];
   state.props = makeProps();
+  resetRunStats();
+  createRunChallenges();
   hideBuildMenu();
 }
 
 function resetLevel(index = state.levelIndex) {
   state.mode = "campaign";
   state.levelIndex = index;
+  state.runTactic = state.selectedTactic;
   resetSharedRun();
   saveProgress();
-  showToast(`第 ${index + 1} 关：${level().name}`);
+  showToast(`第 ${index + 1} 关：${level().name} · ${tactic().name}`);
   updateUi();
 }
 
 function resetEndless() {
   state.mode = "endless";
+  state.runTactic = state.selectedTactic;
   resetSharedRun();
-  showToast("无尽模式：每 5 波 Boss");
+  showToast(`无尽模式：每 5 波 Boss · ${tactic().name}`);
   updateUi();
+}
+
+function openBriefing(mode, index = state.levelIndex) {
+  if (mode === "campaign" && index > state.unlockedLevel) return;
+  state.pendingMode = mode;
+  state.pendingLevelIndex = clampLevelIndex(index);
+  renderBriefing();
+  ui.briefing.classList.remove("hide");
+  ui.briefing.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function closeBriefing() {
+  ui.briefing.classList.add("hide");
+}
+
+function startBriefedRun() {
+  closeBriefing();
+  setScreen("game");
+  if (state.pendingMode === "endless") {
+    resetEndless();
+  } else {
+    resetLevel(state.pendingLevelIndex);
+  }
 }
 
 function selectLevel(index) {
   if (index > state.unlockedLevel) {
     return;
   }
-  setScreen("game");
-  resetLevel(index);
+  openBriefing("campaign", index);
 }
 
 function startEndless() {
-  setScreen("game");
-  resetEndless();
+  openBriefing("endless");
 }
 
 function restartCurrentRun() {
@@ -653,6 +861,11 @@ function startWave() {
   if (state.waveActive) return;
   if (state.mode === "campaign" && state.waveIndex >= level().waves.length) return;
 
+  if (state.countdown > 0 && tacticManualWaveBonus() > 0) {
+    state.coins += tacticManualWaveBonus();
+    state.runStats.manualWaves += 1;
+    showToast(`抢攻奖励 +${tacticManualWaveBonus()}`);
+  }
   state.waveActive = true;
   state.countdown = 0;
   state.spawnTimer = 0;
@@ -691,7 +904,31 @@ function clearCurrentLevel() {
   } else {
     showToast("关卡通过");
   }
+  evaluateChallenges(true);
   updateUi();
+}
+
+function challengeState(challenge) {
+  return state.challenges.find((item) => item.id === challenge.id);
+}
+
+function evaluateChallenges(final = false) {
+  for (const challenge of state.challengeDefs) {
+    const current = challengeState(challenge);
+    if (!current || current.complete) continue;
+    const target = challengeTarget(challenge);
+    const progress = challengeProgress(challenge);
+    const complete = progress >= target;
+    const finalOnly = challenge.id === "noLoss" || challenge.id === "fewTowers";
+    if (complete && (final || !finalOnly)) {
+      current.complete = true;
+      if (!current.paid) {
+        current.paid = true;
+        state.coins += challenge.reward;
+        showToast(`挑战完成：${challenge.name} +${challenge.reward}`);
+      }
+    }
+  }
 }
 
 function finishWaveIfDone() {
@@ -703,7 +940,7 @@ function finishWaveIfDone() {
     if (state.mode === "endless") {
       const bonus = Math.round(32 + state.waveIndex * 5.5 + (wave.traits.includes("boss") ? 62 + state.waveIndex * 3 : 0));
       state.coins += bonus;
-      state.countdown = AUTO_WAVE_DELAY;
+      state.countdown = autoWaveDelay();
       showToast(`第 ${state.waveIndex} 波守住了 +${bonus}`);
       updateUi();
     } else {
@@ -711,8 +948,8 @@ function finishWaveIfDone() {
       if (state.waveIndex >= level().waves.length) {
         clearCurrentLevel();
       } else {
-        state.countdown = AUTO_WAVE_DELAY;
-        showToast(`${AUTO_WAVE_DELAY} 秒后自动刷下一波`);
+        state.countdown = autoWaveDelay();
+        showToast(`${autoWaveDelay()} 秒后自动刷下一波`);
         updateUi();
       }
     }
@@ -735,11 +972,12 @@ function buildAt(siteIndex, towerType) {
     showToast(`通关第 ${type.unlockLevel - 1} 关解锁 ${type.name}`);
     return;
   }
-  if (state.coins < type.cost) {
+  const cost = tacticTowerCost(towerType);
+  if (state.coins < cost) {
     showToast("金币不足");
     return;
   }
-  state.coins -= type.cost;
+  state.coins -= cost;
   state.towers.push({
     ...site,
     type: towerType,
@@ -749,6 +987,8 @@ function buildAt(siteIndex, towerType) {
     angle: 0,
     kind: "tower",
   });
+  state.runStats.towersBuilt += 1;
+  if (towerType === "snow") state.runStats.snowBuilt += 1;
   state.selectedTower = state.towers[state.towers.length - 1];
   state.selectedBuild = null;
   hideBuildMenu();
@@ -802,6 +1042,7 @@ function towerStats(tower) {
       damage: type.damage * Math.pow(1.17, levelBonus),
       fireRate: Math.max(0.2, type.fireRate * Math.pow(0.955, levelBonus)),
       splash: type.splash + Math.min(96, levelBonus * 7),
+      slowDuration: (type.slowDuration || 0) + Math.min(1.8, levelBonus * 0.16) + (type.slow ? tacticSlowBonus() : 0),
       armorPierce: type.armorPierce + levelBonus * 2.2,
       shieldBonus: type.shieldBonus + levelBonus * 0.08,
     };
@@ -813,6 +1054,7 @@ function towerStats(tower) {
     damage: type.damage * damageScale,
     fireRate: Math.max(0.34, type.fireRate * (1 - levelBonus * 0.08)),
     splash: type.splash + levelBonus * 10,
+    slowDuration: (type.slowDuration || 0) + levelBonus * 0.32 + (type.slow ? tacticSlowBonus() : 0),
     armorPierce: type.armorPierce + levelBonus * 2,
     shieldBonus: type.shieldBonus + levelBonus * 0.12,
   };
@@ -841,8 +1083,12 @@ function applyDamage(target, damage, stats, now) {
   }
 
   if (target.kind === "enemy" && stats.slow) {
-    target.slowUntil = now + 1.25;
+    target.slowUntil = Math.max(target.slowUntil, now + (stats.slowDuration || 1.25));
     target.slowFactor = stats.slow;
+    if (stats.name === towerTypes.snow.name) {
+      state.runStats.slowsApplied += 1;
+      evaluateChallenges();
+    }
   }
 
   state.sparks.push({
@@ -907,7 +1153,9 @@ function updateEnemies(dt, now) {
     }
     if (enemy.segment >= path.length - 1) {
       enemy.escaped = true;
-      state.lives -= enemy.traits.includes("boss") ? 4 : 1;
+      const damage = enemy.traits.includes("boss") ? 4 : 1;
+      state.lives -= damage;
+      state.runStats.livesLost += damage;
       const end = path[path.length - 1];
       state.sparks.push({ x: end.x, y: end.y, r: 30, ttl: 0.32, color: "#ff6f91" });
       if (state.lives <= 0) {
@@ -1020,12 +1268,15 @@ function clearDestroyedProps() {
   for (const prop of state.props) {
     if (prop.hp <= 0 && !prop.dead) {
       prop.dead = true;
-      state.coins += prop.reward;
+      const reward = Math.round(prop.reward * tacticPropRewardMultiplier());
+      state.coins += reward;
+      state.runStats.propsCleared += 1;
       state.sparks.push({ x: prop.x, y: prop.y, r: 32, ttl: 0.42, color: "#ffc75a" });
-      showToast(`清理道具 +${prop.reward}`);
+      showToast(`清理道具 +${reward}`);
     }
   }
   state.props = state.props.filter((prop) => !prop.dead);
+  evaluateChallenges();
 }
 
 function updateSparks(dt) {
@@ -1438,6 +1689,7 @@ function updateUi() {
   ui.continueBtn.textContent = `继续第 ${state.levelIndex + 1} 关`;
   ui.waveBtn.textContent = waveButtonText();
   ui.waveBtn.disabled = state.waveActive || state.paused;
+  renderChallengeTrack();
   updateLevelMap();
   updateStartLevelMap();
   if (state.buildMenuSite !== null) renderBuildMenu(state.buildMenuSite);
@@ -1501,6 +1753,73 @@ function updateStartLevelMap() {
   ui.startLevelMap.append(endlessButton);
 }
 
+function renderBriefing() {
+  const mode = state.pendingMode;
+  const index = state.pendingLevelIndex;
+  const targetLevel = mode === "endless" ? endlessLevel : levels[index];
+  const challengeDefs = challengeSet(mode, index);
+  ui.briefingTitle.textContent =
+    mode === "endless" ? `${targetLevel.name} · 持久战` : `第 ${index + 1} 关：${targetLevel.name}`;
+
+  ui.rulesList.innerHTML = "";
+  rules.forEach((rule) => {
+    const item = document.createElement("li");
+    item.textContent = rule;
+    ui.rulesList.append(item);
+  });
+
+  ui.challengeList.innerHTML = "";
+  challengeDefs.forEach((challenge) => {
+    const card = document.createElement("div");
+    card.className = "challenge-card";
+    card.innerHTML = `<strong>${challenge.name}</strong><span>${challenge.text} · 奖励 ${challenge.reward} 金币</span>`;
+    ui.challengeList.append(card);
+  });
+
+  ui.tacticList.innerHTML = "";
+  tacticCards.forEach((card) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "tactic-card";
+    if (card.id === state.selectedTactic) button.classList.add("active");
+    button.innerHTML = `<strong>${card.name}</strong><span>${card.text}</span>`;
+    button.addEventListener("click", () => {
+      state.selectedTactic = card.id;
+      renderBriefing();
+    });
+    ui.tacticList.append(button);
+  });
+}
+
+function renderChallengeTrack() {
+  if (!ui.challengeTrack) return;
+  if (state.screen !== "game" || state.challengeDefs.length === 0) {
+    ui.challengeTrack.innerHTML = "";
+    lastChallengeTrackKey = "";
+    return;
+  }
+  const key = state.challengeDefs
+    .map((challenge) => {
+      const current = challengeState(challenge);
+      return `${challenge.id}:${challengeProgress(challenge)}/${challengeTarget(challenge)}:${current?.complete ? 1 : 0}`;
+    })
+    .join("|");
+  if (key === lastChallengeTrackKey) return;
+  lastChallengeTrackKey = key;
+  ui.challengeTrack.innerHTML = "";
+  state.challengeDefs.forEach((challenge) => {
+    const current = challengeState(challenge);
+    const target = challengeTarget(challenge);
+    const progress = challengeProgress(challenge);
+    const chip = document.createElement("div");
+    chip.className = "challenge-chip";
+    if (current?.complete) chip.classList.add("complete");
+    const status = current?.complete ? "完成" : `${progress}/${target}`;
+    chip.innerHTML = `<strong>${challenge.name}</strong><span>${status} · +${challenge.reward}</span>`;
+    ui.challengeTrack.append(chip);
+  });
+}
+
 function renderBuildMenu(siteIndex) {
   if (state.screen !== "game") return;
   const site = point(level().build[siteIndex]);
@@ -1511,14 +1830,15 @@ function renderBuildMenu(siteIndex) {
   const available = towerOrder.filter(isTowerUnlocked);
   available.forEach((key) => {
     const type = towerTypes[key];
+    const cost = tacticTowerCost(key);
     const button = document.createElement("button");
     button.type = "button";
     button.className = "build-option";
-    button.disabled = state.coins < type.cost;
+    button.disabled = state.coins < cost;
     button.innerHTML = `
       <span class="tower-dot ${key}"></span>
       <span><strong>${type.name}</strong><small>${type.role}</small></span>
-      <span class="build-cost">${type.cost}</span>
+      <span class="build-cost">${cost}</span>
     `;
     button.addEventListener("click", () => buildAt(siteIndex, key));
     ui.buildMenu.append(button);
@@ -1596,12 +1916,23 @@ ui.waveBtn.addEventListener("click", startWave);
 ui.restartBtn.addEventListener("click", restartCurrentRun);
 ui.levelsBtn.addEventListener("click", () => setScreen("levels"));
 ui.continueBtn.addEventListener("click", () => selectLevel(state.levelIndex));
+ui.briefingCloseBtn.addEventListener("click", closeBriefing);
+ui.startBriefingBtn.addEventListener("click", startBriefedRun);
 ui.pauseBtn.addEventListener("click", () => setPaused(!state.paused));
 ui.resumeBtn.addEventListener("click", () => setPaused(false));
 ui.pauseRestartBtn.addEventListener("click", restartCurrentRun);
 ui.backToLevelsBtn.addEventListener("click", () => setScreen("levels"));
 
-window.addEventListener("resize", resize);
+function queueResize() {
+  resize();
+  requestAnimationFrame(resize);
+  clearTimeout(queueResize.timer);
+  queueResize.timer = setTimeout(resize, 260);
+}
+
+window.addEventListener("resize", queueResize);
+window.addEventListener("orientationchange", queueResize);
+window.visualViewport?.addEventListener("resize", queueResize);
 
 function loop(timestamp) {
   const now = timestamp / 1000;

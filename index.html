@@ -17,6 +17,30 @@
           <button id="continueBtn" class="primary compact" type="button">继续游戏</button>
         </div>
         <div class="level-select-grid" id="startLevelMap"></div>
+        <div class="briefing hide" id="briefing" aria-label="战前准备">
+          <div class="briefing__header">
+            <div>
+              <p class="eyebrow">战前准备</p>
+              <h2 id="briefingTitle">第 1 关</h2>
+            </div>
+            <button id="briefingCloseBtn" class="icon-button" type="button" title="关闭">×</button>
+          </div>
+          <div class="briefing__grid">
+            <section class="briefing__section">
+              <h3>游戏规则</h3>
+              <ul id="rulesList"></ul>
+            </section>
+            <section class="briefing__section">
+              <h3>挑战任务</h3>
+              <div class="briefing-list" id="challengeList"></div>
+            </section>
+            <section class="briefing__section">
+              <h3>战术卡</h3>
+              <div class="tactic-list" id="tacticList"></div>
+            </section>
+          </div>
+          <button id="startBriefingBtn" class="primary" type="button">开始守望</button>
+        </div>
       </section>
 
       <section class="game-surface" aria-label="家园守望塔防游戏">
@@ -54,6 +78,11 @@
         <div class="panel level-panel">
           <div class="panel-title">已解锁关卡</div>
           <div class="level-map" id="levelMap"></div>
+        </div>
+
+        <div class="panel challenge-panel">
+          <div class="panel-title">挑战任务</div>
+          <div class="challenge-track" id="challengeTrack"></div>
         </div>
 
         <button id="waveBtn" class="primary" type="button">开始波次</button>
