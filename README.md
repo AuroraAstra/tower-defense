@@ -2,6 +2,10 @@
 
 静态 HTML5 Canvas 塔防游戏，可直接部署到 GitHub Pages、Netlify、Vercel 或任意静态文件服务器。
 
+## 在线访问
+
+- GitHub Pages：<https://auroraastra.github.io/tower-defense/>
+
 ## 当前版本
 
 - 版本：0.5.0
