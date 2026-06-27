@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>家园守望塔防</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="level-screen" id="levelScreen" aria-label="选择关卡">
+        <div class="level-screen__header">
+          <div>
+            <p class="eyebrow">自动刷波闯关塔防</p>
+            <h1>家园守望</h1>
+          </div>
+          <button id="continueBtn" class="primary compact" type="button">继续游戏</button>
+        </div>
+        <div class="level-select-grid" id="startLevelMap"></div>
+      </section>
+
+      <section class="game-surface" aria-label="家园守望塔防游戏">
+        <canvas id="game" width="1200" height="720"></canvas>
+        <div class="toast" id="toast">第 1 关</div>
+        <div class="build-menu hide" id="buildMenu" aria-label="选择防御塔"></div>
+        <div class="pause-menu hide" id="pauseMenu" aria-label="暂停菜单">
+          <div class="pause-menu__box">
+            <h2>已暂停</h2>
+            <button id="resumeBtn" class="primary" type="button">继续</button>
+            <button id="pauseRestartBtn" class="secondary" type="button">重新开始本关</button>
+            <button id="backToLevelsBtn" class="secondary" type="button">返回选关</button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="hud" aria-label="游戏控制">
+        <div class="brand">
+          <div>
+            <p class="eyebrow">自动刷波闯关塔防</p>
+            <h1>家园守望</h1>
+          </div>
+          <button id="pauseBtn" class="icon-button" type="button" title="暂停">Ⅱ</button>
+        </div>
+
+        <div class="stats">
+          <div><span>关卡</span><strong id="levelStat">1</strong></div>
+          <div><span>波次</span><strong id="waveStat">0/4</strong></div>
+          <div><span>房屋耐久</span><strong id="lifeStat">20</strong></div>
+          <div><span>金币</span><strong id="coinStat">185</strong></div>
+          <div><span>下一波</span><strong id="countdownStat">7s</strong></div>
+          <div><span>塔解锁</span><strong id="towerUnlockStat">1/5</strong></div>
+        </div>
+
+        <div class="panel level-panel">
+          <div class="panel-title">已解锁关卡</div>
+          <div class="level-map" id="levelMap"></div>
+        </div>
+
+        <button id="waveBtn" class="primary" type="button">开始波次</button>
+        <button id="restartBtn" class="secondary" type="button">重新开始</button>
+        <button id="levelsBtn" class="secondary" type="button">选择关卡</button>
+      </aside>
+    </main>
+
+    <script src="./game.js"></script>
+  </body>
+</html>
