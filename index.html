@@ -26,6 +26,11 @@
               <input id="playerInput" type="text" maxlength="14" placeholder="输入昵称" autocomplete="off" />
               <button id="registerBtn" class="secondary compact" type="button">注册/切换</button>
             </div>
+            <div class="save-controls">
+              <button id="exportSaveBtn" class="secondary compact" type="button">导出存档</button>
+              <button id="importSaveBtn" class="secondary compact" type="button">导入存档</button>
+              <input id="importSaveInput" type="file" accept="application/json,.json" hidden />
+            </div>
             <div class="account-meta">
               <span>星章</span>
               <strong id="medalStat">0</strong>
@@ -52,6 +57,10 @@
           </div>
           <div class="briefing__grid">
             <section class="briefing__section">
+              <h3>本关情报</h3>
+              <div class="briefing-list" id="intelligenceList"></div>
+            </section>
+            <section class="briefing__section">
               <h3>游戏规则</h3>
               <ul id="rulesList"></ul>
             </section>
@@ -71,8 +80,30 @@
       <section class="game-surface" aria-label="家园守望塔防游戏">
         <canvas id="game" width="1200" height="720"></canvas>
         <div class="toast" id="toast">第 1 关</div>
+        <div class="story-overlay hide" id="storyOverlay" aria-live="polite">
+          <span class="story-overlay__tag">NEURO-GRID</span>
+          <strong id="storyOverlayText">系统初始化完成</strong>
+        </div>
         <div class="build-menu hide" id="buildMenu" aria-label="选择防御塔"></div>
         <div class="draft-panel hide" id="draftPanel" aria-label="局内成长选择"></div>
+        <div class="debug-panel hide" id="debugPanel" aria-label="调试面板">
+          <div class="debug-panel__box">
+            <div class="debug-panel__header">
+              <div>
+                <p class="eyebrow">Debug</p>
+                <h2>调试入口</h2>
+              </div>
+              <button id="debugCloseBtn" class="icon-button" type="button" title="关闭">×</button>
+            </div>
+            <div class="debug-actions">
+              <button id="debugCoinsBtn" class="secondary compact" type="button">金币 +500</button>
+              <button id="debugClearBtn" class="secondary compact" type="button">直接通关</button>
+              <button id="debugUnlockBtn" class="secondary compact" type="button">解锁全关</button>
+              <button id="debugBossBtn" class="secondary compact" type="button">召唤 Boss</button>
+            </div>
+            <pre id="debugInfo"></pre>
+          </div>
+        </div>
         <div class="pause-menu hide" id="pauseMenu" aria-label="暂停菜单">
           <div class="pause-menu__box">
             <h2>已暂停</h2>
@@ -92,7 +123,7 @@
           <button id="pauseBtn" class="icon-button" type="button" title="暂停">Ⅱ</button>
         </div>
 
-        <div class="stats">
+        <div class="stats hud-page" data-hud-page="stats">
           <div><span>关卡</span><strong id="levelStat">1</strong></div>
           <div><span>波次</span><strong id="waveStat">0/4</strong></div>
           <div><span>房屋耐久</span><strong id="lifeStat">20</strong></div>
@@ -101,17 +132,27 @@
           <div><span>塔解锁</span><strong id="towerUnlockStat">1/5</strong></div>
         </div>
 
-        <div class="panel level-panel">
+        <div class="panel level-panel hud-page" data-hud-page="map">
           <div class="panel-title">已解锁关卡</div>
           <div class="level-map" id="levelMap"></div>
         </div>
 
-        <div class="panel challenge-panel">
+        <div class="panel challenge-panel hud-page" data-hud-page="tasks">
           <div class="panel-title">挑战任务</div>
           <div class="challenge-track" id="challengeTrack"></div>
         </div>
 
-        <div class="panel combat-panel">
+        <div class="panel insight-panel hud-page" data-hud-page="tower">
+          <div class="panel-title">选中详情</div>
+          <div class="tower-detail" id="towerDetail"></div>
+        </div>
+
+        <div class="panel buff-panel hud-page" data-hud-page="buffs">
+          <div class="panel-title">当前 Buff</div>
+          <div class="buff-track" id="buffTrack"></div>
+        </div>
+
+        <div class="panel combat-panel hud-page" data-hud-page="actions">
           <div class="panel-title">战术操作</div>
           <div class="action-grid">
             <button id="randomBuildBtn" class="secondary compact" type="button">随机召唤</button>
@@ -124,9 +165,20 @@
         <button id="waveBtn" class="primary" type="button">开始波次</button>
         <button id="restartBtn" class="secondary" type="button">重新开始</button>
         <button id="levelsBtn" class="secondary" type="button">选择关卡</button>
+        <button id="soundBtn" class="secondary mobile-tool" type="button">音效 开</button>
+        <button id="debugBtn" class="secondary mobile-tool hide" type="button">调试</button>
+        <nav class="mobile-tabs" aria-label="移动端底部标签">
+          <button class="active" type="button" data-tab="stats">状态</button>
+          <button type="button" data-tab="map">关卡</button>
+          <button type="button" data-tab="tasks">任务</button>
+          <button type="button" data-tab="tower">塔</button>
+          <button type="button" data-tab="buffs">Buff</button>
+          <button type="button" data-tab="actions">操作</button>
+        </nav>
       </aside>
     </main>
 
+    <script src="./config.js"></script>
     <script src="./game.js"></script>
   </body>
 </html>

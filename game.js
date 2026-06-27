@@ -1,9 +1,3 @@
-const GAME_VERSION = "0.8.0";
-const AUTO_WAVE_DELAY = 7;
-const SAVE_KEY = "homewatch_tower_defense_save_v1";
-const PROFILE_STORE_KEY = "homewatch_player_profiles_v1";
-const ACTIVE_PROFILE_KEY = "homewatch_active_profile_v1";
-
 const canvas = document.querySelector("#game");
 const ctx = canvas.getContext("2d");
 
@@ -25,11 +19,14 @@ const ui = {
   briefing: document.querySelector("#briefing"),
   briefingTitle: document.querySelector("#briefingTitle"),
   briefingCloseBtn: document.querySelector("#briefingCloseBtn"),
+  intelligenceList: document.querySelector("#intelligenceList"),
   rulesList: document.querySelector("#rulesList"),
   challengeList: document.querySelector("#challengeList"),
   tacticList: document.querySelector("#tacticList"),
   startBriefingBtn: document.querySelector("#startBriefingBtn"),
   gameSurface: document.querySelector(".game-surface"),
+  storyOverlay: document.querySelector("#storyOverlay"),
+  storyOverlayText: document.querySelector("#storyOverlayText"),
   hud: document.querySelector(".hud"),
   buildMenu: document.querySelector("#buildMenu"),
   pauseMenu: document.querySelector("#pauseMenu"),
@@ -48,480 +45,22 @@ const ui = {
   mergeBtn: document.querySelector("#mergeBtn"),
   redeployBtn: document.querySelector("#redeployBtn"),
   combatNote: document.querySelector("#combatNote"),
-};
-
-const towerOrder = ["bottle", "snow", "sun", "fan", "rocket"];
-const towerTypes = {
-  bottle: {
-    name: "瓶子炮",
-    unlockLevel: 1,
-    cost: 45,
-    color: "#62caff",
-    range: 118,
-    fireRate: 0.82,
-    damage: 20,
-    splash: 0,
-    pierce: 1,
-    slow: 0,
-    shieldBonus: 1,
-    armorPierce: 0,
-    role: "单体高爆发",
-    tag: "Burst",
-  },
-  snow: {
-    name: "雪花塔",
-    unlockLevel: 2,
-    cost: 65,
-    color: "#78eba7",
-    range: 112,
-    fireRate: 1,
-    damage: 11,
-    splash: 18,
-    pierce: 1,
-    slow: 0.5,
-    slowDuration: 1.9,
-    shieldBonus: 1.8,
-    armorPierce: 1,
-    role: "控制辅助",
-    tag: "CC",
-  },
-  sun: {
-    name: "太阳花",
-    unlockLevel: 3,
-    cost: 80,
-    color: "#ffc75a",
-    range: 96,
-    fireRate: 1.14,
-    damage: 20,
-    splash: 62,
-    pierce: 1,
-    slow: 0,
-    shieldBonus: 0.9,
-    armorPierce: 0,
-    role: "群体范围伤害",
-    tag: "AOE",
-  },
-  fan: {
-    name: "风扇塔",
-    unlockLevel: 4,
-    cost: 95,
-    color: "#d6a3ff",
-    range: 148,
-    fireRate: 0.58,
-    damage: 15,
-    splash: 26,
-    pierce: 3,
-    slow: 0,
-    shieldBonus: 0.8,
-    armorPierce: 2,
-    role: "穿透压制",
-    tag: "Pierce",
-  },
-  rocket: {
-    name: "火箭塔",
-    unlockLevel: 5,
-    cost: 120,
-    color: "#ff6f91",
-    range: 188,
-    fireRate: 1.68,
-    damage: 46,
-    splash: 78,
-    pierce: 1,
-    slow: 0,
-    shieldBonus: 1.25,
-    armorPierce: 6,
-    role: "远程爆破",
-    tag: "Burst",
-  },
-};
-
-const pathSets = [
-  [
-    [0.02, 0.2],
-    [0.25, 0.2],
-    [0.25, 0.55],
-    [0.52, 0.55],
-    [0.52, 0.28],
-    [0.8, 0.28],
-    [0.8, 0.74],
-    [0.96, 0.74],
-  ],
-  [
-    [0.02, 0.78],
-    [0.2, 0.78],
-    [0.2, 0.34],
-    [0.42, 0.34],
-    [0.42, 0.64],
-    [0.64, 0.64],
-    [0.64, 0.22],
-    [0.84, 0.22],
-    [0.84, 0.56],
-    [0.96, 0.56],
-  ],
-  [
-    [0.02, 0.42],
-    [0.22, 0.42],
-    [0.22, 0.18],
-    [0.45, 0.18],
-    [0.45, 0.78],
-    [0.67, 0.78],
-    [0.67, 0.34],
-    [0.88, 0.34],
-    [0.88, 0.68],
-    [0.96, 0.68],
-  ],
-  [
-    [0.03, 0.62],
-    [0.18, 0.62],
-    [0.18, 0.24],
-    [0.38, 0.24],
-    [0.38, 0.48],
-    [0.58, 0.48],
-    [0.58, 0.78],
-    [0.78, 0.78],
-    [0.78, 0.36],
-    [0.96, 0.36],
-  ],
-  [
-    [0.02, 0.3],
-    [0.16, 0.3],
-    [0.16, 0.72],
-    [0.36, 0.72],
-    [0.36, 0.2],
-    [0.57, 0.2],
-    [0.57, 0.58],
-    [0.76, 0.58],
-    [0.76, 0.18],
-    [0.96, 0.18],
-  ],
-];
-
-const buildSets = [
-  [
-    [0.15, 0.4],
-    [0.36, 0.36],
-    [0.42, 0.7],
-    [0.62, 0.43],
-    [0.7, 0.13],
-    [0.72, 0.64],
-    [0.89, 0.5],
-  ],
-  [
-    [0.1, 0.55],
-    [0.29, 0.52],
-    [0.36, 0.18],
-    [0.5, 0.47],
-    [0.54, 0.82],
-    [0.72, 0.43],
-    [0.74, 0.08],
-    [0.91, 0.34],
-  ],
-  [
-    [0.12, 0.2],
-    [0.14, 0.62],
-    [0.34, 0.36],
-    [0.36, 0.7],
-    [0.56, 0.56],
-    [0.58, 0.13],
-    [0.76, 0.55],
-    [0.78, 0.2],
-    [0.92, 0.48],
-  ],
-  [
-    [0.09, 0.38],
-    [0.28, 0.16],
-    [0.32, 0.48],
-    [0.48, 0.68],
-    [0.62, 0.28],
-    [0.72, 0.62],
-    [0.88, 0.18],
-    [0.9, 0.58],
-  ],
-  [
-    [0.08, 0.52],
-    [0.25, 0.58],
-    [0.28, 0.14],
-    [0.48, 0.38],
-    [0.5, 0.78],
-    [0.68, 0.36],
-    [0.72, 0.74],
-    [0.88, 0.34],
-    [0.88, 0.08],
-  ],
-];
-
-const propSets = [
-  [
-    ["box", 0.1, 0.68],
-    ["stump", 0.34, 0.16],
-    ["crystal", 0.62, 0.78],
-  ],
-  [
-    ["box", 0.08, 0.22],
-    ["stump", 0.34, 0.76],
-    ["crystal", 0.57, 0.36],
-    ["box", 0.9, 0.76],
-  ],
-  [
-    ["stump", 0.08, 0.82],
-    ["box", 0.31, 0.56],
-    ["crystal", 0.56, 0.34],
-    ["box", 0.75, 0.8],
-    ["crystal", 0.93, 0.18],
-  ],
-  [
-    ["box", 0.08, 0.12],
-    ["crystal", 0.26, 0.72],
-    ["stump", 0.48, 0.18],
-    ["box", 0.68, 0.58],
-  ],
-  [
-    ["crystal", 0.1, 0.82],
-    ["box", 0.3, 0.44],
-    ["stump", 0.5, 0.08],
-    ["crystal", 0.67, 0.84],
-    ["box", 0.88, 0.52],
-  ],
-];
-
-const levelNames = [
-  "晨光草场",
-  "糖果河湾",
-  "风车小径",
-  "雾灯港口",
-  "矿石山坡",
-  "霜叶林地",
-  "齿轮峡谷",
-  "星砂废墟",
-  "熔岩外环",
-  "王城门前",
-];
-
-function createLevels() {
-  return Array.from({ length: 10 }, (_, index) => {
-    const levelNumber = index + 1;
-    const route = index % pathSets.length;
-    const earlyEase = Math.max(0, 3 - index) * 0.06;
-    const hpScale = Math.pow(1.18, index) * (1 - earlyEase);
-    const waveCount = 5;
-    return {
-      name: levelNames[index],
-      coins: 205 + index * 24 + Math.max(0, 3 - index) * 10,
-      lives: Math.max(14, 24 - Math.floor(index / 2)),
-      path: pathSets[route],
-      build: buildSets[route],
-      props: propSets[route].map(([type, x, y], propIndex) => ({
-        type,
-        hp: Math.round((105 + levelNumber * 28 + propIndex * 22) * hpScale),
-        reward: 36 + levelNumber * 6 + propIndex * 8,
-        at: [x, y],
-      })),
-      waves: Array.from({ length: waveCount }, (_, waveIndex) =>
-        createWave(levelNumber, waveIndex, hpScale),
-      ),
-    };
-  });
-}
-
-function createWave(levelNumber, waveIndex, hpScale) {
-  const bossWave = waveIndex === 4;
-  const traits = [];
-  if (levelNumber >= 2 && waveIndex === 1) traits.push("swift");
-  if (levelNumber >= 3 && waveIndex >= 2) traits.push("shield");
-  if (levelNumber >= 5 && waveIndex >= 3) traits.push("armor");
-  if (levelNumber >= 7 && waveIndex >= 3) traits.push("regen");
-  if (bossWave) traits.push("boss");
-
-  const traitHpBonus =
-    traits.includes("shield") * 0.15 +
-    traits.includes("armor") * 0.18 +
-    traits.includes("regen") * 0.12 +
-    traits.includes("boss") * 1.45;
-  const baseHp = 58 + levelNumber * 28;
-  const earlyEase = Math.max(0, 4 - levelNumber) * 0.055;
-  const hp = Math.round(baseHp * hpScale * (1 + waveIndex * 0.32 + traitHpBonus) * (1 - earlyEase));
-  const speed = bossWave
-    ? 43 + levelNumber * 2.2
-    : 55 + levelNumber * 3.4 + waveIndex * 3.6 + (traits.includes("swift") ? 16 : 0);
-  const count = bossWave
-    ? 1 + Math.floor(levelNumber / 5)
-    : 6 + levelNumber + waveIndex * 3 - (levelNumber <= 3 ? 1 : 0);
-  return {
-    count,
-    hp,
-    speed,
-    reward: Math.max(7, 9 + Math.floor(levelNumber * 0.85) + waveIndex),
-    gap: bossWave ? 1.2 : Math.max(0.34, 0.82 - levelNumber * 0.025 - waveIndex * 0.045),
-    size: bossWave ? 22 + levelNumber * 0.7 : 12 + levelNumber * 0.35 + waveIndex * 0.5,
-    shield: traits.includes("shield") ? Math.round(hp * (0.22 + levelNumber * 0.012)) : 0,
-    armor: traits.includes("armor") ? 2 + Math.floor(levelNumber / 2) : 0,
-    regen: traits.includes("regen") ? 2 + levelNumber * 0.8 : 0,
-    traits,
-  };
-}
-
-function createEndlessWave(waveIndex) {
-  const waveNumber = waveIndex + 1;
-  const bossWave = waveNumber % 5 === 0;
-  const cycle = Math.floor(waveIndex / 5);
-  const earlyEase = Math.max(0, 10 - waveIndex) * 0.035;
-  const traits = [];
-  if (waveNumber >= 4 && waveNumber % 2 === 1) traits.push("swift");
-  if (waveNumber >= 6) traits.push("shield");
-  if (waveNumber >= 10) traits.push("armor");
-  if (waveNumber >= 14 && waveNumber % 3 !== 1) traits.push("regen");
-  if (bossWave) traits.push("boss");
-
-  const growth = Math.pow(1.085, waveIndex);
-  const baseHp = bossWave ? 220 + cycle * 86 : 76 + waveIndex * 14;
-  const hp = Math.round(baseHp * growth * (bossWave ? 1.16 + cycle * 0.065 : 1) * (1 - earlyEase));
-  const speed = bossWave
-    ? Math.min(94, 43 + cycle * 3.2)
-    : Math.min(128, 56 + waveIndex * 1.55 + (traits.includes("swift") ? 12 : 0));
-  const count = bossWave ? 1 + Math.floor(cycle / 4) : Math.min(40, 7 + Math.floor(waveIndex * 1.35));
-
-  return {
-    count,
-    hp,
-    speed,
-    reward: Math.round((bossWave ? 42 + cycle * 10 : 12 + waveIndex * 1.2) * (1 + cycle * 0.04)),
-    gap: bossWave ? 1.08 : Math.max(0.3, 0.84 - waveIndex * 0.008),
-    size: bossWave ? Math.min(42, 25 + cycle * 1.2) : Math.min(22, 13 + waveIndex * 0.18),
-    shield: traits.includes("shield") ? Math.round(hp * Math.min(0.42, 0.14 + waveIndex * 0.006)) : 0,
-    armor: traits.includes("armor") ? Math.min(28, 3 + Math.floor(waveIndex / 4)) : 0,
-    regen: traits.includes("regen") ? Math.min(46, 2 + waveIndex * 0.7) : 0,
-    traits,
-  };
-}
-
-const levels = createLevels();
-const rules = [
-  "怪物会沿道路进攻房屋，房屋耐久归零则挑战失败。",
-  "每关 5 波，倒计时结束会自动刷波，也可以手动提前开波。",
-  "清理地图道具会获得金币；防御塔可升级，战役模式最高 3 级。",
-  "每波结束或清理关键道具后可获得三选一被动 Buff，强化火力网、经济或克制能力。",
-  "可用随机召唤建塔，也可将两个同类型同等级塔合成为随机高阶塔。",
-  "特殊怪拥有高速、护盾、护甲、回血或 Boss 特性，需要搭配不同防御塔克制。",
-];
-
-const tacticCards = [
-  {
-    id: "frost",
-    name: "霜线预案",
-    text: "开局金币 +25，雪花塔费用 -10，所有减速时长再 +0.35 秒。",
-  },
-  {
-    id: "salvage",
-    name: "清障合同",
-    text: "清理道具奖励 +35%，适合先打资源再铺塔。",
-  },
-  {
-    id: "overdrive",
-    name: "抢攻节拍",
-    text: "立即开波按钮额外奖励 +18 金币，但自动倒计时缩短 2 秒。",
-  },
-];
-
-const draftCards = [
-  {
-    id: "burstProtocol",
-    name: "单体爆发协议",
-    text: "瓶子炮与火箭塔伤害 +18%，用于压制精英与 Boss。",
-    kind: "towerRole",
-  },
-  {
-    id: "aoeExpansion",
-    name: "范围溅射扩容",
-    text: "群伤塔溅射半径 +16，太阳花与火箭塔获得额外清场能力。",
-    kind: "towerRole",
-  },
-  {
-    id: "controlNet",
-    name: "控制火力网",
-    text: "减速时长 +0.45 秒，风扇塔额外轻微推迟敌人进度。",
-    kind: "control",
-  },
-  {
-    id: "salvageLoop",
-    name: "以战养战",
-    text: "击杀金币 +15%，道具奖励 +12%，强化局内经济循环。",
-    kind: "economy",
-  },
-  {
-    id: "rapidFoundry",
-    name: "快速铸塔",
-    text: "随机召唤费用 -12，建造与升级的资源压力更低。",
-    kind: "economy",
-  },
-  {
-    id: "armorCrack",
-    name: "破甲弹芯",
-    text: "所有防御塔破甲 +3，护甲怪受到的边际压制降低。",
-    kind: "counter",
-  },
-  {
-    id: "rangeMapping",
-    name: "火力网测绘",
-    text: "所有塔射程 +12，转弯处覆盖时间更长。",
-    kind: "coverage",
-  },
-  {
-    id: "mergeCatalyst",
-    name: "合成催化",
-    text: "合成后的新塔等级额外 +1，战役模式仍受等级上限限制。",
-    kind: "merge",
-  },
-];
-
-const shopItems = [
-  {
-    id: "coinSeed",
-    name: "储蓄罐",
-    text: "每局开局金币 +30。",
-    cost: 6,
-  },
-  {
-    id: "homeGuard",
-    name: "加固围栏",
-    text: "每局房屋耐久 +3。",
-    cost: 8,
-  },
-  {
-    id: "snowMastery",
-    name: "雪花专精",
-    text: "雪花塔费用 -5，减速时长 +0.25 秒。",
-    cost: 10,
-  },
-];
-
-const endlessBuildSet = [
-  [0.08, 0.52],
-  [0.18, 0.12],
-  [0.22, 0.48],
-  [0.28, 0.86],
-  [0.38, 0.42],
-  [0.46, 0.08],
-  [0.48, 0.76],
-  [0.58, 0.36],
-  [0.63, 0.68],
-  [0.72, 0.18],
-  [0.73, 0.82],
-  [0.84, 0.36],
-  [0.88, 0.08],
-  [0.9, 0.62],
-];
-const endlessLevel = {
-  name: "无尽守望",
-  coins: 350,
-  lives: 34,
-  path: pathSets[4],
-  build: endlessBuildSet,
-  props: propSets[4].map(([type, x, y], propIndex) => ({
-    type,
-    hp: 145 + propIndex * 34,
-    reward: 44 + propIndex * 12,
-    at: [x, y],
-  })),
+  towerDetail: document.querySelector("#towerDetail"),
+  buffTrack: document.querySelector("#buffTrack"),
+  exportSaveBtn: document.querySelector("#exportSaveBtn"),
+  importSaveBtn: document.querySelector("#importSaveBtn"),
+  importSaveInput: document.querySelector("#importSaveInput"),
+  soundBtn: document.querySelector("#soundBtn"),
+  debugBtn: document.querySelector("#debugBtn"),
+  debugPanel: document.querySelector("#debugPanel"),
+  debugCloseBtn: document.querySelector("#debugCloseBtn"),
+  debugInfo: document.querySelector("#debugInfo"),
+  debugCoinsBtn: document.querySelector("#debugCoinsBtn"),
+  debugClearBtn: document.querySelector("#debugClearBtn"),
+  debugUnlockBtn: document.querySelector("#debugUnlockBtn"),
+  debugBossBtn: document.querySelector("#debugBossBtn"),
+  mobileTabs: document.querySelectorAll(".mobile-tabs button"),
+  hudPages: document.querySelectorAll(".hud-page"),
 };
 
 const state = {
@@ -552,8 +91,12 @@ const state = {
   sparks: [],
   props: [],
   draftChoices: [],
-  draftOffered: false,
+  draftsTaken: 0,
   draftOpen: false,
+  activeHudTab: "stats",
+  soundEnabled: true,
+  audioReady: false,
+  debugUnlocked: false,
   buffs: {},
   pendingMode: "campaign",
   pendingLevelIndex: 0,
@@ -578,6 +121,51 @@ let lastLevelMapKey = "";
 let lastStartLevelMapKey = "";
 let lastBuildMenuKey = "";
 let lastChallengeTrackKey = "";
+let lastTowerDetailKey = "";
+let lastBuffTrackKey = "";
+
+const traitInfo = {
+  swift: {
+    name: "高速",
+    text: "移速更快，弯道覆盖和减速更关键。",
+    recommend: "雪花塔、风扇塔",
+  },
+  shield: {
+    name: "护盾",
+    text: "先消耗蓝色护盾，护盾倍率高的塔更有效。",
+    recommend: "雪花塔、火箭塔",
+  },
+  armor: {
+    name: "护甲",
+    text: "每次受击会抵消部分伤害，需要破甲压低减免。",
+    recommend: "风扇塔、火箭塔、破甲弹芯",
+  },
+  regen: {
+    name: "回血",
+    text: "持续恢复生命，适合集中火力快速击杀。",
+    recommend: "瓶子炮、火箭塔",
+  },
+  boss: {
+    name: "Boss",
+    text: "生命、体型和进屋伤害更高，会鼓舞小怪并震慑附近防御塔。",
+    recommend: "高等级瓶子炮、火箭塔",
+  },
+};
+
+const sfx = {
+  context: null,
+  master: null,
+};
+
+const VFX = {
+  particles: [],
+  shake: 0,
+};
+
+function debugEnabled() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("debug") === "1";
+}
 
 function clampLevelIndex(index) {
   return Math.max(0, Math.min(levels.length - 1, Number(index) || 0));
@@ -662,6 +250,75 @@ function saveProgress() {
   localStorage.setItem(ACTIVE_PROFILE_KEY, state.profileName);
 }
 
+function currentSavePayload() {
+  return {
+    app: "homewatch-tower-defense",
+    version: GAME_VERSION,
+    exportedAt: new Date().toISOString(),
+    activeProfile: state.profileName,
+    profiles: migrateLegacySave(loadProfiles()),
+  };
+}
+
+function exportSave() {
+  saveProgress();
+  const payload = currentSavePayload();
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const date = new Date().toISOString().slice(0, 10);
+  link.href = url;
+  link.download = `homewatch-save-${date}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  showToast("存档已导出");
+}
+
+function normalizeImportedProfiles(payload) {
+  const source = payload?.profiles || payload;
+  if (!source || typeof source !== "object" || Array.isArray(source)) return null;
+  const profiles = {};
+  Object.values(source).forEach((profile) => {
+    if (!profile || typeof profile !== "object") return;
+    const name = normalizeProfileName(profile.name);
+    profiles[name] = {
+      ...defaultProfile(name),
+      unlockedLevel: clampLevelIndex(profile.unlockedLevel),
+      levelIndex: Math.min(clampLevelIndex(profile.levelIndex), clampLevelIndex(profile.unlockedLevel)),
+      medals: Math.max(0, Number(profile.medals) || 0),
+      shop: profile.shop && typeof profile.shop === "object" ? profile.shop : {},
+    };
+  });
+  return Object.keys(profiles).length ? profiles : null;
+}
+
+function importSaveFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.addEventListener("load", () => {
+    try {
+      const payload = JSON.parse(String(reader.result || "{}"));
+      const profiles = normalizeImportedProfiles(payload);
+      if (!profiles) throw new Error("Invalid save");
+      const active = normalizeProfileName(payload.activeProfile || Object.keys(profiles)[0]);
+      saveProfiles(profiles);
+      localStorage.setItem(ACTIVE_PROFILE_KEY, profiles[active] ? active : Object.keys(profiles)[0]);
+      loadSave();
+      closeBriefing();
+      resetLevel(state.levelIndex);
+      setScreen("levels");
+      showToast("存档已导入");
+    } catch (error) {
+      showToast("存档文件无效");
+    } finally {
+      ui.importSaveInput.value = "";
+    }
+  });
+  reader.readAsText(file);
+}
+
 function switchProfile(name) {
   const profileName = normalizeProfileName(name);
   const profiles = migrateLegacySave(loadProfiles());
@@ -682,6 +339,10 @@ function level() {
 
 function currentWave() {
   return state.mode === "endless" ? createEndlessWave(state.waveIndex) : level().waves[state.waveIndex];
+}
+
+function fmtNumber(value, digits = 0) {
+  return Number(value).toFixed(digits).replace(/\.0+$/, "");
 }
 
 function resize() {
@@ -715,6 +376,191 @@ function showToast(text) {
   ui.toast.classList.remove("hide");
   clearTimeout(showToast.timer);
   showToast.timer = setTimeout(() => ui.toast.classList.add("hide"), 1700);
+}
+
+function pushLog(text) {
+  state.systemLog = text;
+  if (ui.combatNote && !state.selectedTower && state.selectedBuild === null) {
+    ui.combatNote.textContent = text;
+  }
+  showStoryOverlay(text);
+}
+
+function storyTag(text) {
+  const match = String(text).match(/^\[([^\]]+)\]/);
+  return match ? match[1] : "NEURO-GRID";
+}
+
+function storyBody(text) {
+  return String(text).replace(/^\[[^\]]+\]\s*/, "");
+}
+
+function showStoryOverlay(text) {
+  if (!ui.storyOverlay || !ui.storyOverlayText) return;
+  const tag = ui.storyOverlay.querySelector(".story-overlay__tag");
+  if (tag) tag.textContent = storyTag(text);
+  ui.storyOverlayText.textContent = storyBody(text);
+  ui.storyOverlay.classList.remove("hide");
+  ui.storyOverlay.style.animation = "none";
+  ui.storyOverlay.offsetHeight;
+  ui.storyOverlay.style.animation = "";
+  clearTimeout(showStoryOverlay.timer);
+  showStoryOverlay.timer = setTimeout(() => ui.storyOverlay.classList.add("hide"), 3400);
+}
+
+function triggerStory(levelNumber) {
+  if (state.mode === "endless") {
+    pushLog("[NEURO-GRID] 无尽协议接管火力网");
+    return;
+  }
+  pushLog(`[NEURO-GRID] 第 ${levelNumber} 层防线接入`);
+  if (levelNumber === 1) pushLog("[NEURO-GRID] 系统初始化完成");
+  if (levelNumber === 3) pushLog("[WARNING] 神经污染扩散");
+  if (levelNumber === 6) pushLog("[CRITICAL] 系统开始自我重组");
+  if (levelNumber === 10) pushLog("[ERROR] 你正在被系统学习");
+  if (levelNumber === 12) pushLog("[WARNING] 记忆分区出现重复玩家指纹");
+  if (levelNumber === 15) pushLog("[CRITICAL] 防御塔开始预测你的建造顺序");
+  if (levelNumber === 18) pushLog("[ERROR] 家园核心确认：玩家即为防线意识");
+  if (levelNumber === 20) pushLog("[NEURO-GRID] 终层协议启动，系统等待与你合并");
+}
+
+function addShake(intensity) {
+  VFX.shake = Math.max(VFX.shake, intensity);
+}
+
+function vfxTypeForStats(stats) {
+  if (stats.name === towerTypes.snow.name) return "ice";
+  if (stats.name === towerTypes.sun.name) return "heat";
+  if (stats.name === towerTypes.rocket.name) return "corrupt";
+  return "neuro";
+}
+
+function spawnParticle(x, y, color, scale = 1) {
+  const angle = Math.random() * Math.PI * 2;
+  const speed = (0.8 + Math.random() * 2.8) * scale;
+  VFX.particles.push({
+    x,
+    y,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
+    life: 0.55 + Math.random() * 0.45,
+    size: 1.5 + Math.random() * 2.7 * scale,
+    color,
+  });
+}
+
+function triggerVFX(x, y, type = "neuro", burst = 14) {
+  const colors = {
+    neuro: "#4ef0b3",
+    ice: "#4cc9ff",
+    heat: "#ffb703",
+    corrupt: "#ff3d5a",
+  };
+  const color = colors[type] || colors.neuro;
+  for (let i = 0; i < burst; i += 1) {
+    spawnParticle(x, y, color, type === "corrupt" ? 1.25 : 1);
+  }
+  addShake(type === "corrupt" ? 7 : 4);
+}
+
+function triggerHitVFX(x, y, type = "neuro") {
+  const colors = {
+    neuro: "#4ef0b3",
+    ice: "#4cc9ff",
+    heat: "#ffb703",
+    corrupt: "#ff3d5a",
+  };
+  for (let i = 0; i < 4; i += 1) spawnParticle(x, y, colors[type] || colors.neuro, 0.55);
+  if (type === "corrupt") addShake(1.5);
+}
+
+function updateParticles(dt) {
+  for (const particle of VFX.particles) {
+    particle.x += particle.vx * 58 * dt;
+    particle.y += particle.vy * 58 * dt;
+    particle.vx *= 0.985;
+    particle.vy *= 0.985;
+    particle.life -= dt * 1.65;
+  }
+  VFX.particles = VFX.particles.filter((particle) => particle.life > 0);
+  VFX.shake = Math.max(0, VFX.shake - dt * 22);
+}
+
+function applyShake(ctx, intensity) {
+  if (!intensity) return;
+  ctx.translate((Math.random() - 0.5) * intensity, (Math.random() - 0.5) * intensity);
+}
+
+function ensureAudio() {
+  if (!state.soundEnabled) return null;
+  if (!sfx.context) {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return null;
+    sfx.context = new AudioContext();
+    sfx.master = sfx.context.createGain();
+    sfx.master.gain.value = 0.08;
+    sfx.master.connect(sfx.context.destination);
+  }
+  if (sfx.context.state === "suspended") sfx.context.resume();
+  state.audioReady = true;
+  return sfx.context;
+}
+
+function playTone(freq, duration = 0.08, type = "sine", gain = 1, slide = 1) {
+  const audio = ensureAudio();
+  if (!audio || !sfx.master) return;
+  const osc = audio.createOscillator();
+  const envelope = audio.createGain();
+  const now = audio.currentTime;
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, now);
+  osc.frequency.exponentialRampToValueAtTime(Math.max(1, freq * slide), now + duration);
+  envelope.gain.setValueAtTime(0.0001, now);
+  envelope.gain.exponentialRampToValueAtTime(0.7 * gain, now + 0.012);
+  envelope.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+  osc.connect(envelope);
+  envelope.connect(sfx.master);
+  osc.start(now);
+  osc.stop(now + duration + 0.02);
+}
+
+function playSound(name) {
+  if (!state.soundEnabled) return;
+  const patterns = {
+    build: () => {
+      playTone(520, 0.07, "triangle", 0.9, 1.24);
+      setTimeout(() => playTone(720, 0.06, "triangle", 0.7, 1.1), 45);
+    },
+    shoot: () => playTone(760, 0.035, "square", 0.3, 0.78),
+    hit: () => playTone(180, 0.045, "sawtooth", 0.28, 0.62),
+    wave: () => playTone(240, 0.16, "sawtooth", 1, 1.85),
+    boss: () => {
+      playTone(92, 0.22, "sawtooth", 1.1, 0.55);
+      setTimeout(() => playTone(138, 0.2, "square", 0.75, 0.7), 70);
+    },
+    clear: () => {
+      playTone(440, 0.08, "triangle", 0.8, 1.2);
+      setTimeout(() => playTone(660, 0.1, "triangle", 0.8, 1.28), 75);
+      setTimeout(() => playTone(880, 0.12, "triangle", 0.75, 1.18), 150);
+    },
+    fail: () => playTone(150, 0.24, "sawtooth", 0.9, 0.48),
+    reward: () => playTone(980, 0.09, "triangle", 0.65, 1.35),
+    ui: () => playTone(360, 0.045, "triangle", 0.35, 1.12),
+  };
+  patterns[name]?.();
+}
+
+function setSoundEnabled(enabled) {
+  state.soundEnabled = enabled;
+  if (!enabled && sfx.context?.state === "running") sfx.context.suspend();
+  ui.soundBtn.textContent = `音效 ${enabled ? "开" : "关"}`;
+  localStorage.setItem("homewatch_sound_enabled_v1", enabled ? "1" : "0");
+}
+
+function setHudTab(tab) {
+  state.activeHudTab = tab;
+  ui.mobileTabs.forEach((button) => button.classList.toggle("active", button.dataset.tab === tab));
+  ui.hudPages.forEach((page) => page.classList.toggle("active", page.dataset.hudPage === tab));
 }
 
 function setScreen(screen) {
@@ -797,7 +643,11 @@ function buffCount(id) {
 }
 
 function randomSummonCost() {
-  return Math.max(35, 72 - buffCount("rapidFoundry") * 12);
+  const pool = unlockedTowerPool();
+  const averageCost =
+    pool.reduce((sum, type) => sum + tacticTowerCost(type), 0) / Math.max(1, pool.length);
+  const randomDiscount = state.mode === "endless" ? 0.72 : 0.68;
+  return Math.max(22, Math.round(averageCost * randomDiscount) - buffCount("rapidFoundry") * 8);
 }
 
 function unlockedTowerPool() {
@@ -809,7 +659,11 @@ function randomFrom(list) {
 }
 
 function maxTowerLevel() {
-  return state.mode === "endless" ? Infinity : 3;
+  if (state.mode === "endless") return Infinity;
+  if (state.levelIndex >= 15) return 7;
+  if (state.levelIndex >= 10) return 6;
+  if (state.levelIndex >= 5) return 4;
+  return 3;
 }
 
 function clampTowerLevel(level) {
@@ -1003,15 +857,18 @@ function resetSharedRun() {
   state.towers = [];
   state.bullets = [];
   state.sparks = [];
+  VFX.particles = [];
+  VFX.shake = 0;
   state.props = makeProps();
   state.draftChoices = [];
-  state.draftOffered = false;
+  state.draftsTaken = 0;
   state.draftOpen = false;
   state.buffs = {};
   ui.draftPanel.classList.add("hide");
   resetRunStats();
   createRunChallenges();
   hideBuildMenu();
+  triggerStory(state.mode === "campaign" ? state.levelIndex + 1 : 0);
 }
 
 function resetLevel(index = state.levelIndex) {
@@ -1084,6 +941,7 @@ function nextLevel() {
 
 function spawnEnemy(wave) {
   const start = point(level().path[0]);
+  const boss = wave.traits.includes("boss");
   state.enemies.push({
     x: start.x,
     y: start.y,
@@ -1099,10 +957,14 @@ function spawnEnemy(wave) {
     size: wave.size,
     reward: wave.reward,
     traits: wave.traits,
+    visualSeed: Math.random(),
     slowUntil: 0,
     slowFactor: 1,
+    bossPulse: boss ? 4 : 0,
+    bossAuraUntil: 0,
     kind: "enemy",
   });
+  if (boss) playSound("boss");
 }
 
 function startWave() {
@@ -1134,7 +996,13 @@ function startWave() {
   state.selectedBuild = null;
   const wave = currentWave();
   const label = state.mode === "endless" ? `无尽第 ${state.waveIndex + 1} 波` : `第 ${state.waveIndex + 1} 波`;
+  pushLog(
+    wave.traits.includes("boss")
+      ? "[CRITICAL] 大型污染源进入能量路径"
+      : `[NEURO-GRID] ${label} 污染体接近`,
+  );
   showToast(`${label}${wave.traits.includes("boss") ? " Boss 来袭" : "开始"}`);
+  playSound(wave.traits.includes("boss") ? "boss" : "wave");
   updateUi();
 }
 
@@ -1152,7 +1020,9 @@ function clearCurrentLevel() {
 
   if (state.levelIndex >= levels.length - 1) {
     state.ended = true;
-    showToast("10 关全部通关");
+    pushLog("[NEURO-GRID] 二十级防线闭环，系统与你完成同步");
+    showToast("20 关全部通关");
+    playSound("clear");
   } else if (state.unlockedLevel > previousUnlocked) {
     const newlyUnlockedTower = towerOrder.find(
       (key) => towerTypes[key].unlockLevel === state.unlockedLevel + 1,
@@ -1162,8 +1032,11 @@ function clearCurrentLevel() {
         ? `解锁第 ${state.levelIndex + 2} 关和 ${towerTypes[newlyUnlockedTower].name}`
         : `解锁第 ${state.levelIndex + 2} 关`,
     );
+    playSound("clear");
   } else {
+    pushLog("[NEURO-GRID] 污染波形已被压制");
     showToast("关卡通过");
+    playSound("clear");
   }
   evaluateChallenges(true);
   updateUi();
@@ -1206,7 +1079,7 @@ function finishWaveIfDone() {
       state.coins += bonus;
       state.countdown = autoWaveDelay();
       showToast(`第 ${state.waveIndex} 波守住了 +${bonus}`);
-      offerDraft(`第 ${state.waveIndex} 波奖励`);
+      offerDraft(`第 ${state.waveIndex} 波奖励`, "wave");
       updateUi();
     } else {
       state.coins += 24 + state.levelIndex * 4 + state.waveIndex * 3;
@@ -1215,20 +1088,32 @@ function finishWaveIfDone() {
       } else {
         state.countdown = autoWaveDelay();
         showToast(`${autoWaveDelay()} 秒后自动刷下一波`);
-        offerDraft(`第 ${state.waveIndex} 波奖励`);
+        offerDraft(`第 ${state.waveIndex} 波奖励`, "wave");
         updateUi();
       }
     }
   }
 }
 
-function offerDraft(reason = "战术成长") {
+function maxDraftOffers() {
+  return state.mode === "endless" ? Infinity : 2;
+}
+
+function canOfferDraft(source = "wave") {
+  if (state.ended || state.levelCleared || state.draftOpen) return false;
+  if (state.draftsTaken >= maxDraftOffers()) return false;
+  if (source === "crystal") return state.draftsTaken === 0;
+  if (state.mode === "endless") return state.waveIndex > 0 && state.waveIndex % 3 === 0;
+  return state.waveIndex > 0 && state.waveIndex % 2 === 0;
+}
+
+function offerDraft(reason = "战术成长", source = "wave") {
+  if (!canOfferDraft(source)) return;
   if (state.ended || state.levelCleared || state.draftOpen) return;
   const choices = createDraftChoices();
   if (choices.length === 0) return;
   state.draftChoices = choices;
   state.draftOpen = true;
-  state.draftOffered = true;
   renderDraft(reason);
 }
 
@@ -1236,10 +1121,12 @@ function chooseDraft(id) {
   const card = state.draftChoices.find((item) => item.id === id);
   if (!card) return;
   state.buffs = { ...state.buffs, [id]: buffCount(id) + 1 };
+  state.draftsTaken += 1;
   state.draftChoices = [];
   state.draftOpen = false;
   ui.draftPanel.classList.add("hide");
   showToast(`${card.name} Lv.${buffCount(id)}`);
+  playSound("reward");
   updateUi();
 }
 
@@ -1289,6 +1176,7 @@ function placeTower(siteIndex, towerType, options = {}) {
   state.selectedBuild = null;
   hideBuildMenu();
   showToast(options.message || `${type.name} 建造完成`);
+  playSound("build");
   updateUi();
   return state.selectedTower;
 }
@@ -1308,6 +1196,7 @@ function upgradeTower(tower = state.selectedTower) {
   tower.level += 1;
   state.selectedTower = tower;
   showToast(`${towerTypes[tower.type].name} 升至 Lv.${tower.level}`);
+  playSound("build");
   updateUi();
 }
 
@@ -1319,6 +1208,7 @@ function sellTower(message = "出售") {
   state.towers = state.towers.filter((item) => item !== tower);
   state.selectedTower = null;
   showToast(`${message} +${refund}`);
+  playSound("reward");
   updateUi();
 }
 
@@ -1383,6 +1273,7 @@ function mergeSelectedTower() {
   state.runStats.merges += 1;
   state.sparks.push({ x: merged.x, y: merged.y, r: 44, ttl: 0.42, color: towerTypes[nextType].color });
   showToast(`合成成功：${towerTypes[nextType].name} Lv.${nextLevel}`);
+  playSound("build");
   evaluateChallenges();
   updateUi();
 }
@@ -1400,7 +1291,7 @@ function upgradeCost(tower) {
   if (state.mode === "endless") {
     return Math.floor(towerTypes[tower.type].cost * 0.9 * Math.pow(1.31, tower.level - 1));
   }
-  return Math.floor(towerTypes[tower.type].cost * (0.78 + tower.level * 0.58));
+  return Math.floor(towerTypes[tower.type].cost * (0.62 + tower.level * 0.46));
 }
 
 function towerStats(tower) {
@@ -1490,6 +1381,29 @@ function applyDamage(target, damage, stats, now) {
     ttl: 0.22,
     color: target.kind === "prop" ? "#ffc75a" : stats.color,
   });
+  triggerHitVFX(target.x, target.y, target.kind === "prop" ? "heat" : vfxTypeForStats(stats));
+  playSound("hit");
+}
+
+function triggerBossPulse(boss, now) {
+  boss.bossPulse = 4.8;
+  boss.bossAuraUntil = now + 0.55;
+  let inspired = 0;
+  for (const enemy of state.enemies) {
+    if (enemy === boss || enemy.dead || enemy.escaped || distance(enemy, boss) > 150) continue;
+    enemy.inspiredUntil = now + 2.2;
+    enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * 0.08);
+    inspired += 1;
+  }
+  for (const tower of state.towers) {
+    if (distance(tower, boss) > 160) continue;
+    tower.stunnedUntil = Math.max(tower.stunnedUntil || 0, now + 0.85);
+    tower.cooldown = Math.max(tower.cooldown, 0.55);
+  }
+  state.sparks.push({ x: boss.x, y: boss.y, r: 82, ttl: 0.5, color: "#ff6f91" });
+  triggerVFX(boss.x, boss.y, "corrupt", 22);
+  playSound("boss");
+  showToast(inspired ? `Boss 鼓舞 ${inspired} 个小怪` : "Boss 震慑火力网");
 }
 
 function update(dt, now) {
@@ -1502,7 +1416,7 @@ function update(dt, now) {
 
   const canAutoWave =
     state.mode === "endless" || (!state.levelCleared && state.waveIndex < level().waves.length);
-  if (!state.waveActive && canAutoWave) {
+  if (state.waveIndex > 0 && !state.waveActive && canAutoWave && state.buildMenuSite === null) {
     state.countdown -= dt;
     if (state.countdown <= 0) startWave();
   }
@@ -1521,6 +1435,7 @@ function update(dt, now) {
   updateTowers(dt, now);
   updateBullets(dt, now);
   updateSparks(dt);
+  updateParticles(dt);
   finishWaveIfDone();
   updateUi();
 }
@@ -1528,10 +1443,15 @@ function update(dt, now) {
 function updateEnemies(dt, now) {
   const path = level().path.map(point);
   for (const enemy of state.enemies) {
+    if (enemy.traits.includes("boss")) {
+      enemy.bossPulse -= dt;
+      if (enemy.bossPulse <= 0) triggerBossPulse(enemy, now);
+    }
     if (enemy.regen > 0 && enemy.hp > 0) {
       enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.regen * dt);
     }
-    const speed = enemy.speed * (enemy.slowUntil > now ? enemy.slowFactor : 1);
+    const inspiredSpeed = enemy.inspiredUntil > now ? 1.22 : 1;
+    const speed = enemy.speed * inspiredSpeed * (enemy.slowUntil > now ? enemy.slowFactor : 1);
     let travel = speed * dt;
     while (travel > 0 && enemy.segment < path.length - 1) {
       const from = path[enemy.segment];
@@ -1554,11 +1474,15 @@ function updateEnemies(dt, now) {
       state.runStats.livesLost += damage;
       const end = path[path.length - 1];
       state.sparks.push({ x: end.x, y: end.y, r: 30, ttl: 0.32, color: "#ff6f91" });
+      triggerVFX(end.x, end.y, "corrupt", enemy.traits.includes("boss") ? 22 : 12);
+      pushLog("[WARNING] 污染体穿透防线，家园核心受损");
       if (state.lives <= 0) {
         state.lives = 0;
         state.ended = true;
         state.waveActive = false;
+        pushLog("[ERROR] 家园核心离线，防御人格等待重启");
         showToast("房屋被攻破");
+        playSound("fail");
       }
       continue;
     }
@@ -1573,13 +1497,17 @@ function updateEnemies(dt, now) {
       enemy.dead = true;
       state.coins += Math.round(enemy.reward * (1 + buffCount("salvageLoop") * 0.15));
       state.sparks.push({ x: enemy.x, y: enemy.y, r: enemy.size + 8, ttl: 0.35, color: "#ffc75a" });
+      triggerVFX(enemy.x, enemy.y, enemy.traits.includes("boss") ? "corrupt" : "neuro", enemy.traits.includes("boss") ? 28 : 14);
+      if (enemy.traits.includes("boss")) pushLog("[NEURO-GRID] 大型污染源已裂解");
+      playSound(enemy.traits.includes("boss") ? "clear" : "reward");
     }
   }
   state.enemies = state.enemies.filter((enemy) => !enemy.dead && !enemy.escaped);
 }
 
-function updateTowers(dt) {
+function updateTowers(dt, now) {
   for (const tower of state.towers) {
+    if ((tower.stunnedUntil || 0) > now) continue;
     const stats = towerStats(tower);
     tower.cooldown -= dt;
     const enemyTarget = state.enemies
@@ -1604,6 +1532,7 @@ function updateTowers(dt) {
         stats,
         color: stats.color,
       });
+      playSound("shoot");
     }
   }
 }
@@ -1668,8 +1597,10 @@ function clearDestroyedProps() {
       state.coins += reward;
       state.runStats.propsCleared += 1;
       state.sparks.push({ x: prop.x, y: prop.y, r: 32, ttl: 0.42, color: "#ffc75a" });
+      triggerVFX(prop.x, prop.y, prop.type === "crystal" ? "ice" : "heat", prop.type === "crystal" ? 20 : 14);
       showToast(`清理道具 +${reward}`);
-      if (prop.type === "crystal" && !state.draftOpen) offerDraft("水晶道具奖励");
+      playSound("reward");
+      if (prop.type === "crystal" && !state.draftOpen) offerDraft("水晶道具奖励", "crystal");
     }
   }
   state.props = state.props.filter((prop) => !prop.dead);
@@ -1688,8 +1619,11 @@ function draw() {
   const w = width();
   const h = height();
   ctx.clearRect(0, 0, w, h);
+  ctx.save();
+  applyShake(ctx, VFX.shake);
   drawBackdrop(w, h);
-  drawPath();
+  drawNeuralBackground(ctx, performance.now());
+  drawEnergyPath(ctx, level().path.map(point), performance.now());
   drawHouse();
   drawProps();
   drawBuildSites();
@@ -1697,22 +1631,29 @@ function draw() {
   drawEnemies();
   drawBullets();
   drawSparks();
+  drawParticles(ctx);
   drawWaveCountdown();
+  ctx.restore();
   if (state.paused) drawBanner("已暂停", "倒计时和战斗已暂停");
-  if (state.levelCleared) drawBanner(state.levelIndex >= levels.length - 1 ? "全部通关" : "关卡通过", "点击右侧按钮进入下一关");
-  if (state.ended && state.lives <= 0) drawBanner("房屋被攻破", "点击右侧按钮重新挑战");
+  if (state.levelCleared) {
+    drawBanner(
+      state.levelIndex >= levels.length - 1 ? "全部通关" : "关卡通过",
+      state.levelIndex >= levels.length - 1 ? "点击重新开始按钮再来一局" : "点击“下一关”继续推进防线",
+    );
+  }
+  if (state.ended && state.lives <= 0) drawBanner("房屋被攻破", "点击“重新挑战”再守一次");
 }
 
 function drawBackdrop(w, h) {
   const grd = ctx.createLinearGradient(0, 0, w, h);
-  grd.addColorStop(0, "#182d28");
-  grd.addColorStop(0.52, "#15242b");
-  grd.addColorStop(1, "#263126");
+  grd.addColorStop(0, "#050d0b");
+  grd.addColorStop(0.52, "#0a1c17");
+  grd.addColorStop(1, "#091416");
   ctx.fillStyle = grd;
   ctx.fillRect(0, 0, w, h);
 
-  ctx.globalAlpha = 0.22;
-  ctx.strokeStyle = "#57705f";
+  ctx.globalAlpha = 0.18;
+  ctx.strokeStyle = "#4ef0b3";
   ctx.lineWidth = 1;
   const grid = Math.max(38, Math.min(58, w / 18));
   for (let x = 0; x < w; x += grid) {
@@ -1731,22 +1672,70 @@ function drawBackdrop(w, h) {
 }
 
 function drawPath() {
-  const path = level().path.map(point);
+  drawEnergyPath(ctx, level().path.map(point), performance.now());
+}
+
+function drawNeuralBackground(ctx, t) {
+  ctx.save();
+  ctx.globalAlpha = 0.14;
+  ctx.strokeStyle = "#4ef0b3";
+  ctx.lineWidth = 1.25;
+
+  for (let i = 0; i < 7; i += 1) {
+    const y = 80 + i * 110;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+
+    for (let x = 0; x < ctx.canvas.width; x += 25) {
+      const wave =
+        Math.sin(x * 0.015 + t * 0.002 + i) * 14 +
+        Math.cos(x * 0.01 + t * 0.001) * 6;
+      ctx.lineTo(x, y + wave);
+    }
+
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function drawEnergyPath(ctx, path, t) {
+  ctx.save();
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-  ctx.strokeStyle = "#665044";
-  ctx.lineWidth = 62;
+  ctx.shadowColor = "rgba(78, 240, 179, 0.38)";
+  ctx.shadowBlur = 26;
+
+  ctx.strokeStyle = "rgba(78, 240, 179, 0.16)";
+  ctx.lineWidth = 66;
   ctx.beginPath();
   path.forEach((p, index) => (index ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
   ctx.stroke();
-  ctx.strokeStyle = "#be8b5b";
+
+  ctx.shadowBlur = 14;
+  ctx.strokeStyle = "rgba(76, 201, 255, 0.2)";
   ctx.lineWidth = 48;
   ctx.stroke();
-  ctx.strokeStyle = "#f7d68a";
+
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "rgba(78, 240, 179, 0.78)";
   ctx.lineWidth = 3;
   ctx.setLineDash([10, 14]);
+  ctx.lineDashOffset = -t * 0.035;
   ctx.stroke();
   ctx.setLineDash([]);
+
+  path.forEach((p, index) => {
+    const pulse = Math.sin(t * 0.003 + index) * 0.5 + 0.5;
+    ctx.beginPath();
+    ctx.fillStyle = `rgba(78, 240, 179, ${0.3 + pulse * 0.6})`;
+    ctx.shadowColor = "#4ef0b3";
+    ctx.shadowBlur = 10 + pulse * 12;
+    ctx.arc(p.x, p.y, 3 + pulse * 2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.restore();
 }
 
 function drawHouse() {
@@ -1874,6 +1863,18 @@ function drawTowers() {
       ctx.arc(tower.x, tower.y, stats.range, 0, Math.PI * 2);
       ctx.stroke();
     }
+    if ((tower.stunnedUntil || 0) > performance.now() / 1000) {
+      ctx.globalAlpha = 0.2;
+      ctx.fillStyle = "#ff6f91";
+      ctx.beginPath();
+      ctx.arc(tower.x, tower.y, 34, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.font = "900 12px Inter, sans-serif";
+      ctx.fillText("震慑", tower.x, tower.y - 32);
+    }
     ctx.save();
     ctx.translate(tower.x, tower.y);
     ctx.rotate(tower.angle);
@@ -1953,43 +1954,334 @@ function drawUpgradeBadge(tower) {
 }
 
 function drawEnemies() {
+  const now = performance.now() / 1000;
   for (const enemy of state.enemies) {
     const radius = enemy.size;
-    const slowed = enemy.slowUntil > performance.now() / 1000;
-    ctx.fillStyle = slowed ? "#8fffe0" : enemy.traits.includes("boss") ? "#ff6f91" : "#ff9f6e";
-    ctx.strokeStyle = enemy.armor ? "#d9dfe6" : "#111820";
-    ctx.lineWidth = enemy.armor ? 5 : 3;
-    ctx.beginPath();
-    ctx.arc(enemy.x, enemy.y, radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    const seed = enemy.visualSeed ?? 0;
+    const slowed = enemy.slowUntil > now;
+    const bob = Math.sin(now * 4.8 + seed * 9) * Math.min(2.2, radius * 0.1);
+    const squish = 1 + Math.sin(now * 8.5 + seed * 12) * 0.055;
+    const x = enemy.x;
+    const y = enemy.y + bob;
 
-    if (enemy.shield > 0) {
-      ctx.strokeStyle = "#62caff";
-      ctx.globalAlpha = 0.68;
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.arc(enemy.x, enemy.y, radius + 6, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-    }
+    ctx.save();
+    ctx.translate(x, y);
+    drawEnemyShadow(radius);
+    ctx.scale(1 / squish, squish);
+    drawEnemyBody(enemy, radius, slowed);
+    if (enemy.traits.includes("swift")) drawEnemyWinglets(radius, now + seed * 10);
+    if (enemy.traits.includes("regen")) drawEnemySprout(radius, now + seed * 8);
+    if (enemy.armor) drawEnemyArmor(radius);
+    if (enemy.shield > 0) drawEnemyShield(radius, enemy.shield / enemy.maxShield, now + seed * 4);
+    if (enemy.traits.includes("boss")) drawEnemyCrown(radius, now + seed * 5);
+    drawEnemyFace(enemy, radius, slowed, now + seed * 6);
+    ctx.restore();
 
-    ctx.fillStyle = "#111820";
-    ctx.beginPath();
-    ctx.arc(enemy.x - radius * 0.35, enemy.y - radius * 0.15, 2.4, 0, Math.PI * 2);
-    ctx.arc(enemy.x + radius * 0.35, enemy.y - radius * 0.15, 2.4, 0, Math.PI * 2);
-    ctx.fill();
     if (enemy.traits.includes("boss")) {
-      ctx.fillStyle = "#ffffff";
+      if (enemy.bossAuraUntil > now) {
+        ctx.globalAlpha = 0.2;
+        ctx.strokeStyle = "#ff6f91";
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.arc(x, y, 150, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+      ctx.fillStyle = "rgba(255, 255, 255, 0.92)";
       ctx.textAlign = "center";
       ctx.font = "900 11px Inter, sans-serif";
-      ctx.fillText("BOSS", enemy.x, enemy.y + radius + 15);
+      ctx.fillText("BOSS", x, y + radius + 16);
     }
-    drawBar(enemy.x - radius, enemy.y - radius - 13, radius * 2, 5, enemy.hp / enemy.maxHp, "#78eba7");
+    if (enemy.inspiredUntil > now && !enemy.traits.includes("boss")) {
+      ctx.fillStyle = "#ffd15a";
+      ctx.textAlign = "center";
+      ctx.font = "900 10px Inter, sans-serif";
+      ctx.fillText("鼓舞", x, y + radius + 14);
+    }
+    drawBar(x - radius, y - radius - 13, radius * 2, 5, enemy.hp / enemy.maxHp, "#78eba7");
     if (enemy.maxShield > 0) {
-      drawBar(enemy.x - radius, enemy.y - radius - 20, radius * 2, 4, enemy.shield / enemy.maxShield, "#62caff");
+      drawBar(x - radius, y - radius - 20, radius * 2, 4, enemy.shield / enemy.maxShield, "#62caff");
     }
   }
+}
+
+function enemyPalette(enemy, slowed) {
+  if (slowed) {
+    return {
+      body: "#183f4b",
+      shade: "#07151a",
+      outline: "#9df7ff",
+      core: "#4cc9ff",
+      accent: "#62caff",
+    };
+  }
+  if (enemy.traits.includes("boss")) {
+    return {
+      body: "#32101d",
+      shade: "#090609",
+      outline: "#ff3d5a",
+      core: "#ff3d5a",
+      accent: "#ffb703",
+    };
+  }
+  if (enemy.traits.includes("regen")) {
+    return {
+      body: "#143525",
+      shade: "#06110c",
+      outline: "#4ef0b3",
+      core: "#4ef0b3",
+      accent: "#8cff6d",
+    };
+  }
+  if (enemy.traits.includes("swift")) {
+    return {
+      body: "#322511",
+      shade: "#090706",
+      outline: "#ffb703",
+      core: "#ffb703",
+      accent: "#ff3d5a",
+    };
+  }
+  if (enemy.shield > 0) {
+    return {
+      body: "#122d3b",
+      shade: "#060c12",
+      outline: "#4cc9ff",
+      core: "#4cc9ff",
+      accent: "#4ef0b3",
+    };
+  }
+  return {
+    body: "#22151b",
+    shade: "#07070a",
+    outline: "#ff3d5a",
+    core: "#4ef0b3",
+    accent: "#86bfb0",
+  };
+}
+
+function drawEnemyShadow(radius) {
+  ctx.save();
+  ctx.globalAlpha = 0.34;
+  ctx.fillStyle = "#03070b";
+  ctx.beginPath();
+  ctx.ellipse(0, radius * 0.78, radius * 1.02, radius * 0.28, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawEnemyBody(enemy, radius, slowed) {
+  const palette = enemyPalette(enemy, slowed);
+  const boss = enemy.traits.includes("boss");
+  const bodyGradient = ctx.createRadialGradient(
+    -radius * 0.28,
+    -radius * 0.34,
+    radius * 0.08,
+    radius * 0.16,
+    radius * 0.16,
+    radius * 1.3,
+  );
+  bodyGradient.addColorStop(0, palette.core);
+  bodyGradient.addColorStop(0.2, palette.body);
+  bodyGradient.addColorStop(1, palette.shade);
+
+  ctx.shadowColor = palette.outline;
+  ctx.shadowBlur = boss ? 20 : 10;
+  ctx.fillStyle = bodyGradient;
+  ctx.strokeStyle = palette.outline;
+  ctx.lineWidth = boss ? 4 : 2.5;
+  ctx.beginPath();
+  ctx.moveTo(-radius * 0.12, -radius * (boss ? 1.2 : 0.98));
+  ctx.bezierCurveTo(radius * 0.62, -radius * 1.08, radius * 1.08, -radius * 0.52, radius * 0.88, radius * 0.08);
+  ctx.bezierCurveTo(radius * 1.12, radius * 0.56, radius * 0.36, radius * 1.02, -radius * 0.08, radius * 0.86);
+  ctx.bezierCurveTo(-radius * 0.62, radius * 1.12, -radius * 1.08, radius * 0.44, -radius * 0.86, -radius * 0.14);
+  ctx.bezierCurveTo(-radius * 1.03, -radius * 0.68, -radius * 0.52, -radius * 1.04, -radius * 0.12, -radius * (boss ? 1.2 : 0.98));
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  drawCorruptionTendrils(radius, palette, boss);
+  drawCorruptionCracks(radius, palette, enemy.visualSeed ?? 0);
+  drawCorruptionCore(radius, palette, boss);
+}
+
+function drawCorruptionTendrils(radius, palette, boss = false) {
+  ctx.save();
+  ctx.strokeStyle = palette.outline;
+  ctx.lineWidth = Math.max(1.6, radius * 0.09);
+  ctx.lineCap = "round";
+  ctx.globalAlpha = boss ? 0.82 : 0.64;
+  const count = boss ? 8 : 5;
+  for (let i = 0; i < count; i += 1) {
+    const angle = (Math.PI * 2 * i) / count + radius * 0.03;
+    const start = radius * (0.52 + (i % 2) * 0.12);
+    const end = radius * (boss ? 1.36 : 1.08);
+    const curl = Math.sin(performance.now() * 0.004 + i) * radius * 0.14;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(angle) * start, Math.sin(angle) * start);
+    ctx.quadraticCurveTo(
+      Math.cos(angle + 0.35) * (start + end) * 0.5 + curl,
+      Math.sin(angle + 0.35) * (start + end) * 0.5,
+      Math.cos(angle) * end,
+      Math.sin(angle) * end,
+    );
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawCorruptionCracks(radius, palette, seed = 0) {
+  ctx.save();
+  ctx.strokeStyle = palette.accent;
+  ctx.lineWidth = Math.max(1, radius * 0.055);
+  ctx.globalAlpha = 0.72;
+  ctx.lineCap = "round";
+  for (let i = 0; i < 4; i += 1) {
+    const angle = seed * 6 + i * 1.55;
+    const x = Math.cos(angle) * radius * 0.18;
+    const y = Math.sin(angle) * radius * 0.18;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(Math.cos(angle + 0.45) * radius * 0.62, Math.sin(angle + 0.45) * radius * 0.58);
+    ctx.lineTo(Math.cos(angle + 0.2) * radius * 0.82, Math.sin(angle + 0.2) * radius * 0.76);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawCorruptionCore(radius, palette, boss = false) {
+  ctx.save();
+  const pulse = 0.72 + Math.sin(performance.now() * 0.006) * 0.18;
+  ctx.shadowColor = palette.core;
+  ctx.shadowBlur = boss ? 26 : 16;
+  ctx.fillStyle = palette.core;
+  ctx.globalAlpha = pulse;
+  ctx.beginPath();
+  ctx.arc(0, -radius * 0.08, radius * (boss ? 0.34 : 0.28), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 0.95;
+  ctx.fillStyle = "#050d0b";
+  ctx.beginPath();
+  ctx.arc(radius * 0.05, -radius * 0.08, radius * (boss ? 0.16 : 0.12), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawEnemyWinglets(radius, time) {
+  const flap = Math.sin(time * 11) * radius * 0.12;
+  ctx.save();
+  ctx.strokeStyle = "#ffb703";
+  ctx.lineWidth = Math.max(2, radius * 0.12);
+  ctx.lineCap = "round";
+  ctx.shadowColor = "#ffb703";
+  ctx.shadowBlur = 10;
+  for (const side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(side * radius * 0.48, -radius * 0.1);
+    ctx.lineTo(side * radius * 1.15, -radius * 0.52 + flap);
+    ctx.lineTo(side * radius * 0.78, radius * 0.24 - flap);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawEnemySprout(radius, time) {
+  const sway = Math.sin(time * 4) * 0.16;
+  ctx.save();
+  ctx.rotate(sway);
+  ctx.strokeStyle = "#4ef0b3";
+  ctx.lineWidth = Math.max(2, radius * 0.14);
+  ctx.lineCap = "round";
+  ctx.shadowColor = "#4ef0b3";
+  ctx.shadowBlur = 12;
+  ctx.beginPath();
+  ctx.moveTo(0, -radius * 0.42);
+  ctx.quadraticCurveTo(radius * 0.2, -radius * 0.88, radius * 0.12, -radius * 1.24);
+  ctx.stroke();
+  ctx.fillStyle = "#4ef0b3";
+  ctx.beginPath();
+  ctx.arc(radius * 0.12, -radius * 1.24, radius * 0.15, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawEnemyArmor(radius) {
+  ctx.save();
+  ctx.fillStyle = "rgba(207, 226, 232, 0.82)";
+  ctx.strokeStyle = "#7f8a99";
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 3; i += 1) {
+    const x = -radius * 0.5 + i * radius * 0.5;
+    ctx.beginPath();
+    ctx.moveTo(x, -radius * 0.72);
+    ctx.lineTo(x + radius * 0.22, -radius * 0.46);
+    ctx.lineTo(x + radius * 0.1, -radius * 0.08);
+    ctx.lineTo(x - radius * 0.22, -radius * 0.3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawEnemyShield(radius, ratio, time) {
+  ctx.save();
+  ctx.rotate(time * 0.7);
+  ctx.globalAlpha = 0.3 + Math.max(0, ratio) * 0.42;
+  ctx.strokeStyle = "#62caff";
+  ctx.lineWidth = 4;
+  ctx.setLineDash([radius * 0.55, radius * 0.24]);
+  ctx.beginPath();
+  ctx.arc(0, 0, radius + 7, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 0.16;
+  ctx.fillStyle = "#62caff";
+  ctx.beginPath();
+  ctx.arc(0, 0, radius + 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawEnemyCrown(radius, time) {
+  const bounce = Math.sin(time * 5) * radius * 0.04;
+  ctx.save();
+  ctx.translate(0, -radius * 0.92 + bounce);
+  ctx.strokeStyle = "#ff3d5a";
+  ctx.lineWidth = Math.max(2.5, radius * 0.12);
+  ctx.lineCap = "round";
+  ctx.shadowColor = "#ff3d5a";
+  ctx.shadowBlur = 18;
+  for (let i = 0; i < 5; i += 1) {
+    const angle = -Math.PI * 0.8 + i * Math.PI * 0.4;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(angle) * radius * 0.28, Math.sin(angle) * radius * 0.12);
+    ctx.lineTo(Math.cos(angle) * radius * 0.86, -radius * 0.52 + Math.sin(angle) * radius * 0.24);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawEnemyFace(enemy, radius, slowed, time) {
+  const palette = enemyPalette(enemy, slowed);
+  ctx.save();
+  ctx.strokeStyle = palette.core;
+  ctx.lineWidth = Math.max(1.4, radius * 0.08);
+  ctx.lineCap = "round";
+  ctx.globalAlpha = 0.82;
+  ctx.shadowColor = palette.core;
+  ctx.shadowBlur = 10;
+  ctx.beginPath();
+  if (enemy.traits.includes("boss")) {
+    ctx.moveTo(-radius * 0.5, radius * 0.32);
+    ctx.quadraticCurveTo(0, radius * 0.56 + Math.sin(time * 2) * radius * 0.04, radius * 0.5, radius * 0.28);
+  } else {
+    ctx.moveTo(-radius * 0.34, radius * 0.24);
+    ctx.quadraticCurveTo(0, radius * 0.38, radius * 0.34, radius * 0.2);
+  }
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawBullets() {
@@ -2016,8 +2308,22 @@ function drawSparks() {
   }
 }
 
+function drawParticles(ctx) {
+  ctx.save();
+  for (const particle of VFX.particles) {
+    ctx.globalAlpha = Math.max(0, particle.life);
+    ctx.fillStyle = particle.color;
+    ctx.shadowColor = particle.color;
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.arc(particle.x, particle.y, particle.size * (0.55 + particle.life), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 function drawWaveCountdown() {
-  if (state.waveActive || state.levelCleared || state.ended || state.paused) return;
+  if (state.waveIndex === 0 || state.waveActive || state.levelCleared || state.ended || state.paused) return;
   const remaining = Math.max(0, Math.ceil(state.countdown));
   const next = currentWave();
   const label = next?.traits.includes("boss") ? `${remaining} 秒后 Boss` : `${remaining} 秒后自动刷波`;
@@ -2080,7 +2386,7 @@ function updateUi() {
   ui.life.textContent = String(state.lives);
   ui.coin.textContent = String(state.coins);
   ui.countdown.textContent =
-    state.waveActive || state.levelCleared || state.ended
+    state.waveActive || state.levelCleared || state.ended || state.waveIndex === 0
       ? "--"
       : `${Math.max(0, Math.ceil(state.countdown))}s`;
   ui.towerUnlock.textContent =
@@ -2089,8 +2395,11 @@ function updateUi() {
   ui.waveBtn.textContent = waveButtonText();
   ui.waveBtn.disabled = state.waveActive || state.paused || state.draftOpen;
   updateCombatControls();
+  renderTowerDetail();
+  renderBuffTrack();
   renderShop();
   renderChallengeTrack();
+  renderDebugInfo();
   updateLevelMap();
   updateStartLevelMap();
   if (state.buildMenuSite !== null) renderBuildMenu(state.buildMenuSite);
@@ -2121,10 +2430,80 @@ function updateCombatControls() {
     ui.combatNote.textContent = `空建造点 · 可指定建塔或随机召唤，费用 ${randomSummonCost()}`;
   } else {
     const activeBuffs = Object.values(state.buffs).reduce((sum, count) => sum + count, 0);
-    ui.combatNote.textContent = activeBuffs
-      ? `已获得 ${activeBuffs} 层局内 Buff`
-      : "选择建造点或防御塔后进行操作";
+    ui.combatNote.textContent =
+      state.systemLog ||
+      (activeBuffs ? `已获得 ${activeBuffs} 层局内 Buff` : "选择建造点或防御塔后进行操作");
   }
+}
+
+function towerDetailRows(tower) {
+  const stats = towerStats(tower);
+  return [
+    ["伤害", fmtNumber(stats.damage, 1)],
+    ["攻速", `${fmtNumber(1 / stats.fireRate, 2)}/秒`],
+    ["射程", fmtNumber(stats.range)],
+    ["溅射", stats.splash > 0 ? fmtNumber(stats.splash) : "无"],
+    ["穿透", `${stats.pierce} 个目标`],
+    ["破甲", fmtNumber(stats.armorPierce, 1)],
+    ["破盾", `${fmtNumber(stats.shieldBonus, 2)}x`],
+    ["减速", stats.slow ? `${Math.round((1 - stats.slow) * 100)}% · ${fmtNumber(stats.slowDuration, 1)}s` : "无"],
+  ];
+}
+
+function renderTowerDetail() {
+  if (!ui.towerDetail) return;
+  const tower = state.selectedTower;
+  const key = tower
+    ? `${tower.type}|${tower.level}|${state.coins}|${JSON.stringify(state.buffs)}|${state.mode}`
+    : `empty|${state.selectedBuild}|${state.mode}|${state.unlockedLevel}`;
+  if (key === lastTowerDetailKey) return;
+  lastTowerDetailKey = key;
+
+  if (!tower) {
+    const unlocked = unlockedTowerPool()
+      .map((type) => towerTypes[type].name)
+      .join("、");
+    ui.towerDetail.innerHTML = `
+      <div class="detail-empty">选择一座塔查看伤害、射程、破甲、破盾和减速效果。</div>
+      <div class="detail-hint">当前可召唤：${unlocked || "暂无"}</div>
+    `;
+    return;
+  }
+
+  const type = towerTypes[tower.type];
+  const rows = towerDetailRows(tower)
+    .map(([label, value]) => `<span>${label}</span><strong>${value}</strong>`)
+    .join("");
+  const upgradeText =
+    tower.level >= maxTowerLevel()
+      ? "已满级"
+      : `升级费用 ${upgradeCost(tower)} 金币${state.coins >= upgradeCost(tower) ? " · 可升级" : ""}`;
+  ui.towerDetail.innerHTML = `
+    <div class="tower-detail__head">
+      <span class="tower-dot ${tower.type}"></span>
+      <div><strong>${type.name} Lv.${tower.level}</strong><span>${type.role}</span></div>
+    </div>
+    <div class="tower-detail__grid">${rows}</div>
+    <div class="detail-hint">${upgradeText}</div>
+  `;
+}
+
+function renderBuffTrack() {
+  if (!ui.buffTrack) return;
+  const key = JSON.stringify(state.buffs);
+  if (key === lastBuffTrackKey) return;
+  lastBuffTrackKey = key;
+  const active = Object.entries(state.buffs).filter(([, count]) => count > 0);
+  if (active.length === 0) {
+    ui.buffTrack.innerHTML = '<div class="detail-empty">通关波次或清理水晶后，在三选一中获得局内 Buff。</div>';
+    return;
+  }
+  ui.buffTrack.innerHTML = active
+    .map(([id, count]) => {
+      const card = draftCards.find((item) => item.id === id);
+      return `<div class="buff-chip"><strong>${card?.name || id}</strong><span>Lv.${count} · ${card?.text || ""}</span></div>`;
+    })
+    .join("");
 }
 
 function waveButtonText() {
@@ -2136,6 +2515,7 @@ function waveButtonText() {
   if (state.ended && state.levelIndex >= levels.length - 1) return "重新开始";
   if (state.levelCleared) return state.levelIndex >= levels.length - 1 ? "重新开始" : "下一关";
   if (state.waveActive) return "波次进行中";
+  if (state.waveIndex === 0) return "开始波次";
   return `立即开波 (${Math.max(0, Math.ceil(state.countdown))}s)`;
 }
 
@@ -2185,6 +2565,34 @@ function updateStartLevelMap() {
   ui.startLevelMap.append(endlessButton);
 }
 
+function briefingTraits(mode, targetLevel) {
+  if (mode === "endless") return ["swift", "shield", "armor", "regen", "boss"];
+  return [...new Set(targetLevel.waves.flatMap((wave) => wave.traits))];
+}
+
+function renderIntelligence(mode, targetLevel) {
+  if (!ui.intelligenceList) return;
+  const traits = briefingTraits(mode, targetLevel);
+  ui.intelligenceList.innerHTML = "";
+  const summary = document.createElement("div");
+  summary.className = "intel-card";
+  const waveText = mode === "endless" ? "无限波，每 5 波 Boss" : `${targetLevel.waves.length} 波`;
+  const traitText = traits.length
+    ? traits.map((trait) => traitInfo[trait]?.name || trait).join("、")
+    : "基础怪";
+  summary.innerHTML = `<strong>${waveText}</strong><span>敌人词条：${traitText}</span>`;
+  ui.intelligenceList.append(summary);
+
+  traits.forEach((trait) => {
+    const info = traitInfo[trait];
+    if (!info) return;
+    const card = document.createElement("div");
+    card.className = "intel-card";
+    card.innerHTML = `<strong>${info.name}</strong><span>${info.text}</span><span>推荐：${info.recommend}</span>`;
+    ui.intelligenceList.append(card);
+  });
+}
+
 function renderBriefing() {
   const mode = state.pendingMode;
   const index = state.pendingLevelIndex;
@@ -2192,6 +2600,8 @@ function renderBriefing() {
   const challengeDefs = challengeSet(mode, index);
   ui.briefingTitle.textContent =
     mode === "endless" ? `${targetLevel.name} · 持久战` : `第 ${index + 1} 关：${targetLevel.name}`;
+
+  renderIntelligence(mode, targetLevel);
 
   ui.rulesList.innerHTML = "";
   rules.forEach((rule) => {
@@ -2272,6 +2682,91 @@ function renderChallengeTrack() {
     chip.innerHTML = `<strong>${challenge.name}</strong><span>${status} · +${challenge.reward} 金币 +${challengeMedalReward(challenge)} 星章</span>`;
     ui.challengeTrack.append(chip);
   });
+}
+
+function renderDebugInfo() {
+  if (!ui.debugInfo) return;
+  const wave = currentWave();
+  ui.debugInfo.textContent = JSON.stringify(
+    {
+      version: GAME_VERSION,
+      profile: state.profileName,
+      screen: state.screen,
+      mode: state.mode,
+      level: state.mode === "endless" ? "endless" : state.levelIndex + 1,
+      waveIndex: state.waveIndex,
+      waveActive: state.waveActive,
+      countdown: Math.max(0, Number(state.countdown.toFixed(2))),
+      lives: state.lives,
+      coins: state.coins,
+      towers: state.towers.length,
+      enemies: state.enemies.length,
+      nextTraits: wave?.traits || [],
+      buffs: state.buffs,
+    },
+    null,
+    2,
+  );
+}
+
+function setDebugOpen(open) {
+  if (open && !debugEnabled() && !state.debugUnlocked) return;
+  ui.debugPanel.classList.toggle("hide", !open);
+  if (open) renderDebugInfo();
+}
+
+function syncDebugAccess() {
+  const enabled = debugEnabled() || state.debugUnlocked;
+  ui.debugBtn.classList.toggle("hide", !enabled);
+  if (!enabled) ui.debugPanel.classList.add("hide");
+}
+
+function debugAddCoins() {
+  state.coins += 500;
+  showToast("调试：金币 +500");
+  playSound("reward");
+  updateUi();
+}
+
+function debugClearLevel() {
+  if (state.screen !== "game") setScreen("game");
+  if (state.mode === "endless") {
+    state.waveActive = false;
+    state.waveIndex += 1;
+    state.countdown = autoWaveDelay();
+    state.enemies = [];
+    state.bullets = [];
+    showToast("调试：无尽波次完成");
+  } else {
+    clearCurrentLevel();
+  }
+  updateUi();
+}
+
+function debugUnlockAll() {
+  state.unlockedLevel = levels.length - 1;
+  saveProgress();
+  showToast("调试：已解锁全部关卡");
+  updateUi();
+}
+
+function debugSpawnBoss() {
+  if (state.screen !== "game") setScreen("game");
+  const base = currentWave() || createEndlessWave(state.waveIndex);
+  spawnEnemy({
+    ...base,
+    count: 1,
+    hp: Math.max(base.hp || 260, 260 + state.levelIndex * 90),
+    shield: Math.max(base.shield || 0, 80 + state.levelIndex * 24),
+    armor: Math.max(base.armor || 0, 4 + state.levelIndex),
+    regen: Math.max(base.regen || 0, 3 + state.levelIndex),
+    speed: Math.min(base.speed || 48, 58),
+    size: Math.max(base.size || 26, 28),
+    reward: Math.max(base.reward || 30, 70),
+    traits: [...new Set([...(base.traits || []), "boss"])],
+  });
+  showToast("调试：Boss 已召唤");
+  updateUi();
 }
 
 function renderDraft(reason) {
@@ -2383,6 +2878,7 @@ function pointerPos(event) {
 
 canvas.addEventListener("pointerdown", (event) => {
   if (state.screen !== "game" || state.paused || state.draftOpen) return;
+  ensureAudio();
   const pos = pointerPos(event);
   const upgradeTarget = [...state.towers].reverse().find((tower) => upgradeBadgeHit(pos, tower));
   if (upgradeTarget) {
@@ -2411,7 +2907,11 @@ canvas.addEventListener("pointerdown", (event) => {
   updateUi();
 });
 
-ui.waveBtn.addEventListener("click", startWave);
+document.addEventListener("pointerdown", ensureAudio, { once: true });
+ui.waveBtn.addEventListener("click", () => {
+  playSound("ui");
+  startWave();
+});
 ui.randomBuildBtn.addEventListener("click", randomSummonAtSelectedSite);
 ui.mergeBtn.addEventListener("click", mergeSelectedTower);
 ui.redeployBtn.addEventListener("click", redeploySelectedTower);
@@ -2422,12 +2922,32 @@ ui.registerBtn.addEventListener("click", () => switchProfile(ui.playerInput.valu
 ui.playerInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") switchProfile(ui.playerInput.value);
 });
+ui.exportSaveBtn.addEventListener("click", exportSave);
+ui.importSaveBtn.addEventListener("click", () => ui.importSaveInput.click());
+ui.importSaveInput.addEventListener("change", () => importSaveFile(ui.importSaveInput.files?.[0]));
+ui.soundBtn.addEventListener("click", () => setSoundEnabled(!state.soundEnabled));
+ui.debugBtn.addEventListener("click", () => setDebugOpen(true));
+ui.debugCloseBtn.addEventListener("click", () => setDebugOpen(false));
+ui.debugCoinsBtn.addEventListener("click", debugAddCoins);
+ui.debugClearBtn.addEventListener("click", debugClearLevel);
+ui.debugUnlockBtn.addEventListener("click", debugUnlockAll);
+ui.debugBossBtn.addEventListener("click", debugSpawnBoss);
+ui.mobileTabs.forEach((button) => {
+  button.addEventListener("click", () => setHudTab(button.dataset.tab));
+});
 ui.briefingCloseBtn.addEventListener("click", closeBriefing);
 ui.startBriefingBtn.addEventListener("click", startBriefedRun);
 ui.pauseBtn.addEventListener("click", () => setPaused(!state.paused));
 ui.resumeBtn.addEventListener("click", () => setPaused(false));
 ui.pauseRestartBtn.addEventListener("click", restartCurrentRun);
 ui.backToLevelsBtn.addEventListener("click", () => setScreen("levels"));
+window.addEventListener("keydown", (event) => {
+  if (event.key === "`" || event.key === "~") {
+    state.debugUnlocked = true;
+    ui.debugBtn.classList.remove("hide");
+    setDebugOpen(true);
+  }
+});
 
 function queueResize() {
   resize();
@@ -2452,5 +2972,8 @@ function loop(timestamp) {
 resize();
 loadSave();
 resetLevel(state.levelIndex);
+setSoundEnabled(localStorage.getItem("homewatch_sound_enabled_v1") !== "0");
+setHudTab(state.activeHudTab);
+syncDebugAccess();
 setScreen("levels");
 requestAnimationFrame(loop);
