@@ -16,6 +16,31 @@
           </div>
           <button id="continueBtn" class="primary compact" type="button">继续游戏</button>
         </div>
+        <div class="account-shop">
+          <section class="account-panel" aria-label="玩家账号">
+            <div>
+              <p class="eyebrow">玩家档案</p>
+              <h2 id="playerName">访客</h2>
+            </div>
+            <div class="account-controls">
+              <input id="playerInput" type="text" maxlength="14" placeholder="输入昵称" autocomplete="off" />
+              <button id="registerBtn" class="secondary compact" type="button">注册/切换</button>
+            </div>
+            <div class="account-meta">
+              <span>星章</span>
+              <strong id="medalStat">0</strong>
+            </div>
+          </section>
+          <section class="shop-panel" aria-label="星章商店">
+            <div class="shop-panel__header">
+              <div>
+                <p class="eyebrow">星章商店</p>
+                <h2>永久升级</h2>
+              </div>
+            </div>
+            <div class="shop-grid" id="shopGrid"></div>
+          </section>
+        </div>
         <div class="level-select-grid" id="startLevelMap"></div>
         <div class="briefing hide" id="briefing" aria-label="战前准备">
           <div class="briefing__header">

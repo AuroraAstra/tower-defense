@@ -1,6 +1,8 @@
-const GAME_VERSION = "0.6.0";
+const GAME_VERSION = "0.7.0";
 const AUTO_WAVE_DELAY = 7;
 const SAVE_KEY = "homewatch_tower_defense_save_v1";
+const PROFILE_STORE_KEY = "homewatch_player_profiles_v1";
+const ACTIVE_PROFILE_KEY = "homewatch_active_profile_v1";
 
 const canvas = document.querySelector("#game");
 const ctx = canvas.getContext("2d");
@@ -15,6 +17,11 @@ const ui = {
   levelScreen: document.querySelector("#levelScreen"),
   startLevelMap: document.querySelector("#startLevelMap"),
   continueBtn: document.querySelector("#continueBtn"),
+  playerName: document.querySelector("#playerName"),
+  playerInput: document.querySelector("#playerInput"),
+  registerBtn: document.querySelector("#registerBtn"),
+  medal: document.querySelector("#medalStat"),
+  shopGrid: document.querySelector("#shopGrid"),
   briefing: document.querySelector("#briefing"),
   briefingTitle: document.querySelector("#briefingTitle"),
   briefingCloseBtn: document.querySelector("#briefingCloseBtn"),
@@ -403,6 +410,27 @@ const tacticCards = [
   },
 ];
 
+const shopItems = [
+  {
+    id: "coinSeed",
+    name: "储蓄罐",
+    text: "每局开局金币 +30。",
+    cost: 6,
+  },
+  {
+    id: "homeGuard",
+    name: "加固围栏",
+    text: "每局房屋耐久 +3。",
+    cost: 8,
+  },
+  {
+    id: "snowMastery",
+    name: "雪花专精",
+    text: "雪花塔费用 -5，减速时长 +0.25 秒。",
+    cost: 10,
+  },
+];
+
 const endlessBuildSet = [
   [0.08, 0.52],
   [0.18, 0.12],
@@ -434,6 +462,9 @@ const endlessLevel = {
 };
 
 const state = {
+  profileName: "访客",
+  medals: 0,
+  shop: {},
   mode: "campaign",
   levelIndex: 0,
   unlockedLevel: 0,
@@ -482,25 +513,97 @@ function clampLevelIndex(index) {
   return Math.max(0, Math.min(levels.length - 1, Number(index) || 0));
 }
 
-function loadSave() {
+function normalizeProfileName(name) {
+  const cleaned = String(name || "").trim().replace(/\s+/g, " ").slice(0, 14);
+  return cleaned || "访客";
+}
+
+function defaultProfile(name = "访客") {
+  return {
+    name: normalizeProfileName(name),
+    version: GAME_VERSION,
+    unlockedLevel: 0,
+    levelIndex: 0,
+    medals: 0,
+    shop: {},
+  };
+}
+
+function loadProfiles() {
+  try {
+    const raw = localStorage.getItem(PROFILE_STORE_KEY);
+    const profiles = raw ? JSON.parse(raw) : {};
+    if (profiles && typeof profiles === "object") return profiles;
+  } catch (error) {
+    localStorage.removeItem(PROFILE_STORE_KEY);
+  }
+  return {};
+}
+
+function saveProfiles(profiles) {
+  localStorage.setItem(PROFILE_STORE_KEY, JSON.stringify(profiles));
+}
+
+function migrateLegacySave(profiles) {
+  if (Object.keys(profiles).length > 0) return profiles;
   try {
     const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return;
+    if (!raw) return profiles;
     const save = JSON.parse(raw);
-    state.unlockedLevel = clampLevelIndex(save.unlockedLevel);
-    state.levelIndex = Math.min(clampLevelIndex(save.levelIndex), state.unlockedLevel);
+    profiles["访客"] = {
+      ...defaultProfile("访客"),
+      unlockedLevel: clampLevelIndex(save.unlockedLevel),
+      levelIndex: Math.min(clampLevelIndex(save.levelIndex), clampLevelIndex(save.unlockedLevel)),
+    };
+    saveProfiles(profiles);
   } catch (error) {
     localStorage.removeItem(SAVE_KEY);
   }
+  return profiles;
+}
+
+function loadSave() {
+  const profiles = migrateLegacySave(loadProfiles());
+  const activeName = normalizeProfileName(localStorage.getItem(ACTIVE_PROFILE_KEY) || "访客");
+  const profile = profiles[activeName] || profiles["访客"] || defaultProfile(activeName);
+  profiles[profile.name] = profile;
+  saveProfiles(profiles);
+  state.profileName = profile.name;
+  state.unlockedLevel = clampLevelIndex(profile.unlockedLevel);
+  state.levelIndex = Math.min(clampLevelIndex(profile.levelIndex), state.unlockedLevel);
+  state.medals = Math.max(0, Number(profile.medals) || 0);
+  state.shop = profile.shop && typeof profile.shop === "object" ? profile.shop : {};
+  localStorage.setItem(ACTIVE_PROFILE_KEY, state.profileName);
+  renderShop.key = "";
 }
 
 function saveProgress() {
+  const profiles = migrateLegacySave(loadProfiles());
   const data = {
+    name: state.profileName,
     version: GAME_VERSION,
     unlockedLevel: state.unlockedLevel,
     levelIndex: state.levelIndex,
+    medals: state.medals,
+    shop: state.shop,
   };
-  localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+  profiles[state.profileName] = data;
+  saveProfiles(profiles);
+  localStorage.setItem(ACTIVE_PROFILE_KEY, state.profileName);
+}
+
+function switchProfile(name) {
+  const profileName = normalizeProfileName(name);
+  const profiles = migrateLegacySave(loadProfiles());
+  if (!profiles[profileName]) profiles[profileName] = defaultProfile(profileName);
+  saveProfiles(profiles);
+  localStorage.setItem(ACTIVE_PROFILE_KEY, profileName);
+  loadSave();
+  closeBriefing();
+  resetLevel(state.levelIndex);
+  setScreen("levels");
+  showToast(`已切换到 ${state.profileName}`);
+  updateUi();
 }
 
 function level() {
@@ -590,6 +693,14 @@ function tacticStartingCoins() {
   return tactic().id === "frost" ? 25 : 0;
 }
 
+function shopStartingCoins() {
+  return state.shop.coinSeed ? 30 : 0;
+}
+
+function shopLivesBonus() {
+  return state.shop.homeGuard ? 3 : 0;
+}
+
 function tacticPropRewardMultiplier() {
   return tactic().id === "salvage" ? 1.35 : 1;
 }
@@ -599,12 +710,14 @@ function tacticManualWaveBonus() {
 }
 
 function tacticTowerCost(type) {
-  const discount = tactic().id === "frost" && type === "snow" ? 10 : 0;
+  const discount =
+    (tactic().id === "frost" && type === "snow" ? 10 : 0) +
+    (state.shop.snowMastery && type === "snow" ? 5 : 0);
   return Math.max(1, towerTypes[type].cost - discount);
 }
 
 function tacticSlowBonus() {
-  return tactic().id === "frost" ? 0.35 : 0;
+  return (tactic().id === "frost" ? 0.35 : 0) + (state.shop.snowMastery ? 0.25 : 0);
 }
 
 function challengeSet(mode, index) {
@@ -688,6 +801,10 @@ function challengeProgress(challenge) {
   return Math.max(0, Math.min(challengeTarget(challenge), challenge.progress()));
 }
 
+function challengeMedalReward(challenge) {
+  return Math.max(1, Math.ceil(challenge.reward / 35));
+}
+
 function resetRunStats() {
   state.runStats = {
     livesLost: 0,
@@ -706,6 +823,20 @@ function createRunChallenges() {
     complete: false,
     paid: false,
   }));
+}
+
+function buyShopItem(id) {
+  const item = shopItems.find((entry) => entry.id === id);
+  if (!item || state.shop[id]) return;
+  if (state.medals < item.cost) {
+    showToast("星章不足");
+    return;
+  }
+  state.medals -= item.cost;
+  state.shop = { ...state.shop, [id]: true };
+  saveProgress();
+  showToast(`已购买：${item.name}`);
+  updateUi();
 }
 
 function firstUnlockedTower() {
@@ -733,8 +864,8 @@ function makeProps() {
 function resetSharedRun() {
   state.waveIndex = 0;
   state.countdown = autoWaveDelay();
-  state.lives = level().lives;
-  state.coins = level().coins + tacticStartingCoins();
+  state.lives = level().lives + shopLivesBonus();
+  state.coins = level().coins + tacticStartingCoins() + shopStartingCoins();
   state.selectedBuild = null;
   state.selectedTower = null;
   state.buildMenuSite = null;
@@ -924,8 +1055,11 @@ function evaluateChallenges(final = false) {
       current.complete = true;
       if (!current.paid) {
         current.paid = true;
+        const medals = challengeMedalReward(challenge);
         state.coins += challenge.reward;
-        showToast(`挑战完成：${challenge.name} +${challenge.reward}`);
+        state.medals += medals;
+        saveProgress();
+        showToast(`挑战完成：${challenge.name} +${challenge.reward} 金币 +${medals} 星章`);
       }
     }
   }
@@ -1667,6 +1801,8 @@ function roundedRect(x, y, w, h, r) {
 }
 
 function updateUi() {
+  ui.playerName.textContent = state.profileName;
+  ui.medal.textContent = String(state.medals);
   ui.level.textContent = state.mode === "endless" ? "无尽" : String(state.levelIndex + 1);
   if (state.mode === "endless") {
     const visibleWave = state.waveIndex + (state.waveActive ? 1 : 0);
@@ -1689,6 +1825,7 @@ function updateUi() {
   ui.continueBtn.textContent = `继续第 ${state.levelIndex + 1} 关`;
   ui.waveBtn.textContent = waveButtonText();
   ui.waveBtn.disabled = state.waveActive || state.paused;
+  renderShop();
   renderChallengeTrack();
   updateLevelMap();
   updateStartLevelMap();
@@ -1772,7 +1909,7 @@ function renderBriefing() {
   challengeDefs.forEach((challenge) => {
     const card = document.createElement("div");
     card.className = "challenge-card";
-    card.innerHTML = `<strong>${challenge.name}</strong><span>${challenge.text} · 奖励 ${challenge.reward} 金币</span>`;
+    card.innerHTML = `<strong>${challenge.name}</strong><span>${challenge.text} · 奖励 ${challenge.reward} 金币 +${challengeMedalReward(challenge)} 星章</span>`;
     ui.challengeList.append(card);
   });
 
@@ -1788,6 +1925,28 @@ function renderBriefing() {
       renderBriefing();
     });
     ui.tacticList.append(button);
+  });
+}
+
+function renderShop() {
+  if (!ui.shopGrid) return;
+  const key = `${state.medals}|${Object.keys(state.shop).sort().join(",")}`;
+  if (renderShop.key === key) return;
+  renderShop.key = key;
+  ui.shopGrid.innerHTML = "";
+  shopItems.forEach((item) => {
+    const owned = Boolean(state.shop[item.id]);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "shop-item";
+    if (owned) button.classList.add("owned");
+    button.disabled = owned || state.medals < item.cost;
+    button.innerHTML = `
+      <span><strong>${item.name}</strong><span>${item.text}</span></span>
+      <span class="shop-item__cost">${owned ? "已拥有" : `${item.cost} 星章`}</span>
+    `;
+    button.addEventListener("click", () => buyShopItem(item.id));
+    ui.shopGrid.append(button);
   });
 }
 
@@ -1815,7 +1974,7 @@ function renderChallengeTrack() {
     chip.className = "challenge-chip";
     if (current?.complete) chip.classList.add("complete");
     const status = current?.complete ? "完成" : `${progress}/${target}`;
-    chip.innerHTML = `<strong>${challenge.name}</strong><span>${status} · +${challenge.reward}</span>`;
+    chip.innerHTML = `<strong>${challenge.name}</strong><span>${status} · +${challenge.reward} 金币 +${challengeMedalReward(challenge)} 星章</span>`;
     ui.challengeTrack.append(chip);
   });
 }
@@ -1916,6 +2075,10 @@ ui.waveBtn.addEventListener("click", startWave);
 ui.restartBtn.addEventListener("click", restartCurrentRun);
 ui.levelsBtn.addEventListener("click", () => setScreen("levels"));
 ui.continueBtn.addEventListener("click", () => selectLevel(state.levelIndex));
+ui.registerBtn.addEventListener("click", () => switchProfile(ui.playerInput.value));
+ui.playerInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") switchProfile(ui.playerInput.value);
+});
 ui.briefingCloseBtn.addEventListener("click", closeBriefing);
 ui.startBriefingBtn.addEventListener("click", startBriefedRun);
 ui.pauseBtn.addEventListener("click", () => setPaused(!state.paused));
