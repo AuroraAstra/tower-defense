@@ -91,6 +91,7 @@ input::placeholder {
 .game-surface.hide,
 .hud.hide,
 .build-menu.hide,
+.draft-panel.hide,
 .pause-menu.hide,
 .briefing.hide {
   display: none;
@@ -479,6 +480,80 @@ canvas {
   font-weight: 800;
 }
 
+.draft-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(8, 12, 18, 0.5);
+  backdrop-filter: blur(10px);
+}
+
+.draft-panel__box {
+  display: grid;
+  gap: 12px;
+  width: min(620px, 100%);
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 8px;
+  background: rgba(28, 36, 48, 0.96);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+}
+
+.draft-panel__box h2,
+.draft-panel__box p {
+  margin: 0;
+}
+
+.draft-panel__box h2 {
+  font-size: 22px;
+}
+
+.draft-panel__box p {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.draft-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.draft-card {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  min-height: 138px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: #222b36;
+  text-align: left;
+}
+
+.draft-card strong,
+.draft-card span {
+  display: block;
+  min-width: 0;
+}
+
+.draft-card strong {
+  color: var(--amber);
+  font-size: 15px;
+}
+
+.draft-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
 .pause-menu {
   position: absolute;
   inset: 0;
@@ -604,6 +679,24 @@ h1 {
   gap: 8px;
 }
 
+.combat-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.combat-note {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
 .challenge-chip {
   display: grid;
   gap: 3px;
@@ -715,6 +808,11 @@ h1 {
 .tower-dot.rocket {
   color: var(--rose);
   background: var(--rose);
+}
+
+.tower-dot.random {
+  color: #ffffff;
+  background: conic-gradient(var(--cyan), var(--amber), var(--rose), var(--mint), var(--cyan));
 }
 
 .tower-choice strong,
@@ -863,6 +961,21 @@ h1 {
     display: none;
   }
 
+  .combat-panel {
+    grid-column: auto;
+    padding: 8px;
+  }
+
+  .combat-panel .panel-title,
+  .combat-note {
+    display: none;
+  }
+
+  .action-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
   h1 {
     font-size: 18px;
   }
@@ -923,6 +1036,32 @@ h1 {
   .build-cost {
     font-size: 11px;
   }
+
+  .draft-panel {
+    padding: 10px;
+  }
+
+  .draft-panel__box {
+    gap: 9px;
+    padding: 12px;
+  }
+
+  .draft-options {
+    gap: 7px;
+  }
+
+  .draft-card {
+    min-height: 112px;
+    padding: 9px;
+  }
+
+  .draft-card strong {
+    font-size: 13px;
+  }
+
+  .draft-card span {
+    font-size: 11px;
+  }
 }
 
 @media (max-width: 560px) {
@@ -949,6 +1088,10 @@ h1 {
 
   .briefing {
     padding: 12px;
+  }
+
+  .draft-options {
+    grid-template-columns: 1fr;
   }
 
   .start-level-card {

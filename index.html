@@ -72,6 +72,7 @@
         <canvas id="game" width="1200" height="720"></canvas>
         <div class="toast" id="toast">第 1 关</div>
         <div class="build-menu hide" id="buildMenu" aria-label="选择防御塔"></div>
+        <div class="draft-panel hide" id="draftPanel" aria-label="局内成长选择"></div>
         <div class="pause-menu hide" id="pauseMenu" aria-label="暂停菜单">
           <div class="pause-menu__box">
             <h2>已暂停</h2>
@@ -108,6 +109,16 @@
         <div class="panel challenge-panel">
           <div class="panel-title">挑战任务</div>
           <div class="challenge-track" id="challengeTrack"></div>
+        </div>
+
+        <div class="panel combat-panel">
+          <div class="panel-title">战术操作</div>
+          <div class="action-grid">
+            <button id="randomBuildBtn" class="secondary compact" type="button">随机召唤</button>
+            <button id="mergeBtn" class="secondary compact" type="button">合成同阶</button>
+            <button id="redeployBtn" class="secondary compact" type="button">撤退回收</button>
+          </div>
+          <div class="combat-note" id="combatNote">选择建造点或防御塔后进行操作</div>
         </div>
 
         <button id="waveBtn" class="primary" type="button">开始波次</button>

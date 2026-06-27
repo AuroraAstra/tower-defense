@@ -1,4 +1,4 @@
-const GAME_VERSION = "0.7.0";
+const GAME_VERSION = "0.8.0";
 const AUTO_WAVE_DELAY = 7;
 const SAVE_KEY = "homewatch_tower_defense_save_v1";
 const PROFILE_STORE_KEY = "homewatch_player_profiles_v1";
@@ -43,6 +43,11 @@ const ui = {
   backToLevelsBtn: document.querySelector("#backToLevelsBtn"),
   challengeTrack: document.querySelector("#challengeTrack"),
   toast: document.querySelector("#toast"),
+  draftPanel: document.querySelector("#draftPanel"),
+  randomBuildBtn: document.querySelector("#randomBuildBtn"),
+  mergeBtn: document.querySelector("#mergeBtn"),
+  redeployBtn: document.querySelector("#redeployBtn"),
+  combatNote: document.querySelector("#combatNote"),
 };
 
 const towerOrder = ["bottle", "snow", "sun", "fan", "rocket"];
@@ -60,7 +65,8 @@ const towerTypes = {
     slow: 0,
     shieldBonus: 1,
     armorPierce: 0,
-    role: "稳定单体",
+    role: "单体高爆发",
+    tag: "Burst",
   },
   snow: {
     name: "雪花塔",
@@ -76,7 +82,8 @@ const towerTypes = {
     slowDuration: 1.9,
     shieldBonus: 1.8,
     armorPierce: 1,
-    role: "减速破盾",
+    role: "控制辅助",
+    tag: "CC",
   },
   sun: {
     name: "太阳花",
@@ -91,7 +98,8 @@ const towerTypes = {
     slow: 0,
     shieldBonus: 0.9,
     armorPierce: 0,
-    role: "近距群伤",
+    role: "群体范围伤害",
+    tag: "AOE",
   },
   fan: {
     name: "风扇塔",
@@ -106,7 +114,8 @@ const towerTypes = {
     slow: 0,
     shieldBonus: 0.8,
     armorPierce: 2,
-    role: "高速穿透",
+    role: "穿透压制",
+    tag: "Pierce",
   },
   rocket: {
     name: "火箭塔",
@@ -122,6 +131,7 @@ const towerTypes = {
     shieldBonus: 1.25,
     armorPierce: 6,
     role: "远程爆破",
+    tag: "Burst",
   },
 };
 
@@ -389,6 +399,8 @@ const rules = [
   "怪物会沿道路进攻房屋，房屋耐久归零则挑战失败。",
   "每关 5 波，倒计时结束会自动刷波，也可以手动提前开波。",
   "清理地图道具会获得金币；防御塔可升级，战役模式最高 3 级。",
+  "每波结束或清理关键道具后可获得三选一被动 Buff，强化火力网、经济或克制能力。",
+  "可用随机召唤建塔，也可将两个同类型同等级塔合成为随机高阶塔。",
   "特殊怪拥有高速、护盾、护甲、回血或 Boss 特性，需要搭配不同防御塔克制。",
 ];
 
@@ -407,6 +419,57 @@ const tacticCards = [
     id: "overdrive",
     name: "抢攻节拍",
     text: "立即开波按钮额外奖励 +18 金币，但自动倒计时缩短 2 秒。",
+  },
+];
+
+const draftCards = [
+  {
+    id: "burstProtocol",
+    name: "单体爆发协议",
+    text: "瓶子炮与火箭塔伤害 +18%，用于压制精英与 Boss。",
+    kind: "towerRole",
+  },
+  {
+    id: "aoeExpansion",
+    name: "范围溅射扩容",
+    text: "群伤塔溅射半径 +16，太阳花与火箭塔获得额外清场能力。",
+    kind: "towerRole",
+  },
+  {
+    id: "controlNet",
+    name: "控制火力网",
+    text: "减速时长 +0.45 秒，风扇塔额外轻微推迟敌人进度。",
+    kind: "control",
+  },
+  {
+    id: "salvageLoop",
+    name: "以战养战",
+    text: "击杀金币 +15%，道具奖励 +12%，强化局内经济循环。",
+    kind: "economy",
+  },
+  {
+    id: "rapidFoundry",
+    name: "快速铸塔",
+    text: "随机召唤费用 -12，建造与升级的资源压力更低。",
+    kind: "economy",
+  },
+  {
+    id: "armorCrack",
+    name: "破甲弹芯",
+    text: "所有防御塔破甲 +3，护甲怪受到的边际压制降低。",
+    kind: "counter",
+  },
+  {
+    id: "rangeMapping",
+    name: "火力网测绘",
+    text: "所有塔射程 +12，转弯处覆盖时间更长。",
+    kind: "coverage",
+  },
+  {
+    id: "mergeCatalyst",
+    name: "合成催化",
+    text: "合成后的新塔等级额外 +1，战役模式仍受等级上限限制。",
+    kind: "merge",
   },
 ];
 
@@ -488,6 +551,10 @@ const state = {
   bullets: [],
   sparks: [],
   props: [],
+  draftChoices: [],
+  draftOffered: false,
+  draftOpen: false,
+  buffs: {},
   pendingMode: "campaign",
   pendingLevelIndex: 0,
   selectedTactic: "frost",
@@ -501,6 +568,9 @@ const state = {
     snowBuilt: 0,
     slowsApplied: 0,
     manualWaves: 0,
+    merges: 0,
+    randomSummons: 0,
+    redeploys: 0,
   },
 };
 
@@ -656,6 +726,8 @@ function setScreen(screen) {
   if (inGame) window.scrollTo(0, 0);
   if (!inGame) {
     hideBuildMenu();
+    ui.draftPanel.classList.add("hide");
+    state.draftOpen = false;
     if (screen === "levels") closeBriefing();
     setPaused(false);
   }
@@ -702,7 +774,7 @@ function shopLivesBonus() {
 }
 
 function tacticPropRewardMultiplier() {
-  return tactic().id === "salvage" ? 1.35 : 1;
+  return (tactic().id === "salvage" ? 1.35 : 1) + buffCount("salvageLoop") * 0.12;
 }
 
 function tacticManualWaveBonus() {
@@ -718,6 +790,44 @@ function tacticTowerCost(type) {
 
 function tacticSlowBonus() {
   return (tactic().id === "frost" ? 0.35 : 0) + (state.shop.snowMastery ? 0.25 : 0);
+}
+
+function buffCount(id) {
+  return state.buffs[id] || 0;
+}
+
+function randomSummonCost() {
+  return Math.max(35, 72 - buffCount("rapidFoundry") * 12);
+}
+
+function unlockedTowerPool() {
+  return towerOrder.filter(isTowerUnlocked);
+}
+
+function randomFrom(list) {
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function maxTowerLevel() {
+  return state.mode === "endless" ? Infinity : 3;
+}
+
+function clampTowerLevel(level) {
+  return state.mode === "endless" ? level : Math.min(maxTowerLevel(), level);
+}
+
+function draftPool() {
+  return draftCards.filter((card) => buffCount(card.id) < 3);
+}
+
+function createDraftChoices(count = 3) {
+  const pool = draftPool();
+  const choices = [];
+  while (choices.length < count && pool.length > 0) {
+    const index = Math.floor(Math.random() * pool.length);
+    choices.push(pool.splice(index, 1)[0]);
+  }
+  return choices;
 }
 
 function challengeSet(mode, index) {
@@ -790,6 +900,17 @@ function challengeSet(mode, index) {
     });
   }
 
+  if (levelNumber >= 4) {
+    challenges.push({
+      id: "mergePlay",
+      name: "合成试验",
+      text: "本关完成 1 次同阶合成",
+      reward: 45 + levelNumber * 3,
+      progress: () => Math.min(state.runStats.merges, 1),
+      target: 1,
+    });
+  }
+
   return challenges;
 }
 
@@ -813,6 +934,9 @@ function resetRunStats() {
     snowBuilt: 0,
     slowsApplied: 0,
     manualWaves: 0,
+    merges: 0,
+    randomSummons: 0,
+    redeploys: 0,
   };
 }
 
@@ -844,7 +968,7 @@ function firstUnlockedTower() {
 }
 
 function canUpgrade(tower) {
-  return (state.mode === "endless" || tower.level < 3) && state.coins >= upgradeCost(tower);
+  return tower.level < maxTowerLevel() && state.coins >= upgradeCost(tower);
 }
 
 function makeProps() {
@@ -880,6 +1004,11 @@ function resetSharedRun() {
   state.bullets = [];
   state.sparks = [];
   state.props = makeProps();
+  state.draftChoices = [];
+  state.draftOffered = false;
+  state.draftOpen = false;
+  state.buffs = {};
+  ui.draftPanel.classList.add("hide");
   resetRunStats();
   createRunChallenges();
   hideBuildMenu();
@@ -977,6 +1106,7 @@ function spawnEnemy(wave) {
 }
 
 function startWave() {
+  if (state.draftOpen) return;
   if (state.ended && !state.levelCleared) {
     restartCurrentRun();
     return;
@@ -1076,6 +1206,7 @@ function finishWaveIfDone() {
       state.coins += bonus;
       state.countdown = autoWaveDelay();
       showToast(`第 ${state.waveIndex} 波守住了 +${bonus}`);
+      offerDraft(`第 ${state.waveIndex} 波奖励`);
       updateUi();
     } else {
       state.coins += 24 + state.levelIndex * 4 + state.waveIndex * 3;
@@ -1084,13 +1215,43 @@ function finishWaveIfDone() {
       } else {
         state.countdown = autoWaveDelay();
         showToast(`${autoWaveDelay()} 秒后自动刷下一波`);
+        offerDraft(`第 ${state.waveIndex} 波奖励`);
         updateUi();
       }
     }
   }
 }
 
+function offerDraft(reason = "战术成长") {
+  if (state.ended || state.levelCleared || state.draftOpen) return;
+  const choices = createDraftChoices();
+  if (choices.length === 0) return;
+  state.draftChoices = choices;
+  state.draftOpen = true;
+  state.draftOffered = true;
+  renderDraft(reason);
+}
+
+function chooseDraft(id) {
+  const card = state.draftChoices.find((item) => item.id === id);
+  if (!card) return;
+  state.buffs = { ...state.buffs, [id]: buffCount(id) + 1 };
+  state.draftChoices = [];
+  state.draftOpen = false;
+  ui.draftPanel.classList.add("hide");
+  showToast(`${card.name} Lv.${buffCount(id)}`);
+  updateUi();
+}
+
 function buildAt(siteIndex, towerType) {
+  return placeTower(siteIndex, towerType, {
+    cost: tacticTowerCost(towerType),
+    source: "build",
+    level: 1,
+  });
+}
+
+function placeTower(siteIndex, towerType, options = {}) {
   const site = point(level().build[siteIndex]);
   const existing = state.towers.find((tower) => tower.siteIndex === siteIndex);
   if (existing) {
@@ -1106,7 +1267,7 @@ function buildAt(siteIndex, towerType) {
     showToast(`通关第 ${type.unlockLevel - 1} 关解锁 ${type.name}`);
     return;
   }
-  const cost = tacticTowerCost(towerType);
+  const cost = Math.max(0, Number(options.cost) || 0);
   if (state.coins < cost) {
     showToast("金币不足");
     return;
@@ -1116,24 +1277,26 @@ function buildAt(siteIndex, towerType) {
     ...site,
     type: towerType,
     siteIndex,
-    level: 1,
+    level: clampTowerLevel(options.level || 1),
     cooldown: 0,
     angle: 0,
     kind: "tower",
   });
   state.runStats.towersBuilt += 1;
+  if (options.source === "random") state.runStats.randomSummons += 1;
   if (towerType === "snow") state.runStats.snowBuilt += 1;
   state.selectedTower = state.towers[state.towers.length - 1];
   state.selectedBuild = null;
   hideBuildMenu();
-  showToast(`${type.name} 建造完成`);
+  showToast(options.message || `${type.name} 建造完成`);
   updateUi();
+  return state.selectedTower;
 }
 
 function upgradeTower(tower = state.selectedTower) {
   if (!tower) return;
   const cost = upgradeCost(tower);
-  if (state.mode === "campaign" && tower.level >= 3) {
+  if (tower.level >= maxTowerLevel()) {
     showToast("已经满级");
     return;
   }
@@ -1148,15 +1311,89 @@ function upgradeTower(tower = state.selectedTower) {
   updateUi();
 }
 
-function sellTower() {
+function sellTower(message = "出售") {
   const tower = state.selectedTower;
   if (!tower) return;
   const refund = Math.floor(towerTypes[tower.type].cost * (0.55 + tower.level * 0.16));
   state.coins += refund;
   state.towers = state.towers.filter((item) => item !== tower);
   state.selectedTower = null;
-  showToast(`出售 +${refund}`);
+  showToast(`${message} +${refund}`);
   updateUi();
+}
+
+function randomSummonAtSelectedSite() {
+  if (state.selectedBuild === null) {
+    showToast("先选择一个空建造点");
+    return;
+  }
+  const siteIndex = state.selectedBuild;
+  const occupied = state.towers.some((tower) => tower.siteIndex === siteIndex);
+  if (occupied) {
+    showToast("该位置已有防御塔");
+    return;
+  }
+  const pool = unlockedTowerPool();
+  if (pool.length === 0) return;
+  const type = randomFrom(pool);
+  placeTower(siteIndex, type, {
+    cost: randomSummonCost(),
+    source: "random",
+    message: `随机召唤：${towerTypes[type].name}`,
+  });
+}
+
+function mergeCandidates(tower = state.selectedTower) {
+  if (!tower) return [];
+  return state.towers.filter(
+    (item) => item !== tower && item.type === tower.type && item.level === tower.level,
+  );
+}
+
+function canMerge(tower = state.selectedTower) {
+  return Boolean(tower && mergeCandidates(tower).length > 0);
+}
+
+function mergeSelectedTower() {
+  const tower = state.selectedTower;
+  if (!tower) {
+    showToast("先选择一座防御塔");
+    return;
+  }
+  const partner = mergeCandidates(tower).sort((a, b) => distance(tower, a) - distance(tower, b))[0];
+  if (!partner) {
+    showToast("需要同类型同等级的另一座塔");
+    return;
+  }
+  const nextType = randomFrom(unlockedTowerPool());
+  const nextLevel = clampTowerLevel(tower.level + 1 + (buffCount("mergeCatalyst") > 0 ? 1 : 0));
+  state.towers = state.towers.filter((item) => item !== tower && item !== partner);
+  const merged = {
+    x: tower.x,
+    y: tower.y,
+    type: nextType,
+    siteIndex: tower.siteIndex,
+    level: nextLevel,
+    cooldown: 0,
+    angle: tower.angle,
+    kind: "tower",
+  };
+  state.towers.push(merged);
+  state.selectedTower = merged;
+  state.runStats.merges += 1;
+  state.sparks.push({ x: merged.x, y: merged.y, r: 44, ttl: 0.42, color: towerTypes[nextType].color });
+  showToast(`合成成功：${towerTypes[nextType].name} Lv.${nextLevel}`);
+  evaluateChallenges();
+  updateUi();
+}
+
+function redeploySelectedTower() {
+  if (!state.selectedTower) {
+    showToast("先选择一座防御塔");
+    return;
+  }
+  state.runStats.redeploys += 1;
+  sellTower("撤退回收");
 }
 
 function upgradeCost(tower) {
@@ -1169,28 +1406,45 @@ function upgradeCost(tower) {
 function towerStats(tower) {
   const type = towerTypes[tower.type];
   const levelBonus = tower.level - 1;
+  const roleDamageBonus =
+    type.tag === "Burst" && buffCount("burstProtocol") > 0
+      ? 1 + buffCount("burstProtocol") * 0.18
+      : 1;
+  const rangeBonus = buffCount("rangeMapping") * 12;
+  const splashBonus =
+    (type.splash > 0 || type.tag === "AOE") && buffCount("aoeExpansion") > 0
+      ? buffCount("aoeExpansion") * 16
+      : 0;
+  const controlBonus = buffCount("controlNet") * 0.45;
+  const armorBonus = buffCount("armorCrack") * 3;
   if (state.mode === "endless") {
     return {
       ...type,
-      range: type.range + Math.min(132, levelBonus * 10),
-      damage: type.damage * Math.pow(1.17, levelBonus),
+      range: type.range + Math.min(132, levelBonus * 10) + rangeBonus,
+      damage: type.damage * Math.pow(1.17, levelBonus) * roleDamageBonus,
       fireRate: Math.max(0.2, type.fireRate * Math.pow(0.955, levelBonus)),
-      splash: type.splash + Math.min(96, levelBonus * 7),
-      slowDuration: (type.slowDuration || 0) + Math.min(1.8, levelBonus * 0.16) + (type.slow ? tacticSlowBonus() : 0),
-      armorPierce: type.armorPierce + levelBonus * 2.2,
+      splash: type.splash + Math.min(96, levelBonus * 7) + splashBonus,
+      slowDuration:
+        (type.slowDuration || 0) +
+        Math.min(1.8, levelBonus * 0.16) +
+        (type.slow ? tacticSlowBonus() + controlBonus : 0),
+      armorPierce: type.armorPierce + levelBonus * 2.2 + armorBonus,
       shieldBonus: type.shieldBonus + levelBonus * 0.08,
+      knockback: tower.type === "fan" ? 0.012 * buffCount("controlNet") : 0,
     };
   }
   const damageScale = 1 + levelBonus * 0.36;
   return {
     ...type,
-    range: type.range + levelBonus * 18,
-    damage: type.damage * damageScale,
+    range: type.range + levelBonus * 18 + rangeBonus,
+    damage: type.damage * damageScale * roleDamageBonus,
     fireRate: Math.max(0.34, type.fireRate * (1 - levelBonus * 0.08)),
-    splash: type.splash + levelBonus * 10,
-    slowDuration: (type.slowDuration || 0) + levelBonus * 0.32 + (type.slow ? tacticSlowBonus() : 0),
-    armorPierce: type.armorPierce + levelBonus * 2,
+    splash: type.splash + levelBonus * 10 + splashBonus,
+    slowDuration:
+      (type.slowDuration || 0) + levelBonus * 0.32 + (type.slow ? tacticSlowBonus() + controlBonus : 0),
+    armorPierce: type.armorPierce + levelBonus * 2 + armorBonus,
     shieldBonus: type.shieldBonus + levelBonus * 0.12,
+    knockback: tower.type === "fan" ? 0.012 * buffCount("controlNet") : 0,
   };
 }
 
@@ -1225,6 +1479,10 @@ function applyDamage(target, damage, stats, now) {
     }
   }
 
+  if (target.kind === "enemy" && stats.knockback > 0) {
+    target.progress = Math.max(0, target.progress - stats.knockback);
+  }
+
   state.sparks.push({
     x: target.x,
     y: target.y,
@@ -1236,6 +1494,10 @@ function applyDamage(target, damage, stats, now) {
 
 function update(dt, now) {
   if (state.screen !== "game") return;
+  if (state.draftOpen) {
+    updateUi();
+    return;
+  }
   if (state.paused || state.ended) return;
 
   const canAutoWave =
@@ -1309,7 +1571,7 @@ function updateEnemies(dt, now) {
   for (const enemy of state.enemies) {
     if (enemy.hp <= 0 && !enemy.dead) {
       enemy.dead = true;
-      state.coins += enemy.reward;
+      state.coins += Math.round(enemy.reward * (1 + buffCount("salvageLoop") * 0.15));
       state.sparks.push({ x: enemy.x, y: enemy.y, r: enemy.size + 8, ttl: 0.35, color: "#ffc75a" });
     }
   }
@@ -1407,6 +1669,7 @@ function clearDestroyedProps() {
       state.runStats.propsCleared += 1;
       state.sparks.push({ x: prop.x, y: prop.y, r: 32, ttl: 0.42, color: "#ffc75a" });
       showToast(`清理道具 +${reward}`);
+      if (prop.type === "crystal" && !state.draftOpen) offerDraft("水晶道具奖励");
     }
   }
   state.props = state.props.filter((prop) => !prop.dead);
@@ -1824,12 +2087,44 @@ function updateUi() {
     state.mode === "endless" ? "全开" : `${unlockedTowerCount()}/${towerOrder.length}`;
   ui.continueBtn.textContent = `继续第 ${state.levelIndex + 1} 关`;
   ui.waveBtn.textContent = waveButtonText();
-  ui.waveBtn.disabled = state.waveActive || state.paused;
+  ui.waveBtn.disabled = state.waveActive || state.paused || state.draftOpen;
+  updateCombatControls();
   renderShop();
   renderChallengeTrack();
   updateLevelMap();
   updateStartLevelMap();
   if (state.buildMenuSite !== null) renderBuildMenu(state.buildMenuSite);
+}
+
+function updateCombatControls() {
+  const hasBuild = state.selectedBuild !== null;
+  const buildOccupied =
+    hasBuild && state.towers.some((tower) => tower.siteIndex === state.selectedBuild);
+  const selectedTower = state.selectedTower;
+  ui.randomBuildBtn.textContent = `随机召唤 ${randomSummonCost()}`;
+  ui.randomBuildBtn.disabled =
+    state.screen !== "game" ||
+    state.paused ||
+    state.draftOpen ||
+    !hasBuild ||
+    buildOccupied ||
+    state.coins < randomSummonCost();
+  ui.mergeBtn.disabled =
+    state.screen !== "game" || state.paused || state.draftOpen || !canMerge(selectedTower);
+  ui.redeployBtn.disabled = state.screen !== "game" || state.paused || state.draftOpen || !selectedTower;
+
+  if (selectedTower) {
+    const stats = towerStats(selectedTower);
+    const mergeReady = canMerge(selectedTower) ? "可合成" : "需同类同级";
+    ui.combatNote.textContent = `${towerTypes[selectedTower.type].name} Lv.${selectedTower.level} · ${stats.role} · ${mergeReady}`;
+  } else if (hasBuild && !buildOccupied) {
+    ui.combatNote.textContent = `空建造点 · 可指定建塔或随机召唤，费用 ${randomSummonCost()}`;
+  } else {
+    const activeBuffs = Object.values(state.buffs).reduce((sum, count) => sum + count, 0);
+    ui.combatNote.textContent = activeBuffs
+      ? `已获得 ${activeBuffs} 层局内 Buff`
+      : "选择建造点或防御塔后进行操作";
+  }
 }
 
 function waveButtonText() {
@@ -1979,14 +2274,59 @@ function renderChallengeTrack() {
   });
 }
 
+function renderDraft(reason) {
+  ui.draftPanel.innerHTML = "";
+  const box = document.createElement("div");
+  box.className = "draft-panel__box";
+  const active = Object.entries(state.buffs)
+    .filter(([, count]) => count > 0)
+    .map(([id, count]) => {
+      const card = draftCards.find((item) => item.id === id);
+      return `${card?.name || id} Lv.${count}`;
+    })
+    .join(" · ");
+  box.innerHTML = `
+    <div>
+      <p>${reason}</p>
+      <h2>选择一项局内 Buff</h2>
+      <p>${active || "当前尚未获得被动加成"}</p>
+    </div>
+  `;
+  const list = document.createElement("div");
+  list.className = "draft-options";
+  state.draftChoices.forEach((card) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "draft-card";
+    button.innerHTML = `<strong>${card.name}</strong><span>${card.text}</span><span>当前 Lv.${buffCount(card.id)}</span>`;
+    button.addEventListener("click", () => chooseDraft(card.id));
+    list.append(button);
+  });
+  box.append(list);
+  ui.draftPanel.append(box);
+  ui.draftPanel.classList.remove("hide");
+}
+
 function renderBuildMenu(siteIndex) {
   if (state.screen !== "game") return;
   const site = point(level().build[siteIndex]);
-  const key = `${state.mode}|${siteIndex}|${state.coins}|${state.unlockedLevel}|${Math.round(width())}|${Math.round(height())}`;
+  const key = `${state.mode}|${siteIndex}|${state.coins}|${state.unlockedLevel}|${randomSummonCost()}|${Math.round(width())}|${Math.round(height())}`;
   if (!ui.buildMenu.classList.contains("hide") && key === lastBuildMenuKey) return;
   lastBuildMenuKey = key;
   ui.buildMenu.innerHTML = "";
-  const available = towerOrder.filter(isTowerUnlocked);
+  const randomButton = document.createElement("button");
+  randomButton.type = "button";
+  randomButton.className = "build-option";
+  randomButton.disabled = state.coins < randomSummonCost();
+  randomButton.innerHTML = `
+    <span class="tower-dot random"></span>
+    <span><strong>随机召唤</strong><small>随机获得已解锁基础塔</small></span>
+    <span class="build-cost">${randomSummonCost()}</span>
+  `;
+  randomButton.addEventListener("click", randomSummonAtSelectedSite);
+  ui.buildMenu.append(randomButton);
+
+  const available = unlockedTowerPool();
   available.forEach((key) => {
     const type = towerTypes[key];
     const cost = tacticTowerCost(key);
@@ -2042,7 +2382,7 @@ function pointerPos(event) {
 }
 
 canvas.addEventListener("pointerdown", (event) => {
-  if (state.screen !== "game" || state.paused) return;
+  if (state.screen !== "game" || state.paused || state.draftOpen) return;
   const pos = pointerPos(event);
   const upgradeTarget = [...state.towers].reverse().find((tower) => upgradeBadgeHit(pos, tower));
   if (upgradeTarget) {
@@ -2072,6 +2412,9 @@ canvas.addEventListener("pointerdown", (event) => {
 });
 
 ui.waveBtn.addEventListener("click", startWave);
+ui.randomBuildBtn.addEventListener("click", randomSummonAtSelectedSite);
+ui.mergeBtn.addEventListener("click", mergeSelectedTower);
+ui.redeployBtn.addEventListener("click", redeploySelectedTower);
 ui.restartBtn.addEventListener("click", restartCurrentRun);
 ui.levelsBtn.addEventListener("click", () => setScreen("levels"));
 ui.continueBtn.addEventListener("click", () => selectLevel(state.levelIndex));
